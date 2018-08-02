@@ -1,3 +1,15 @@
+
+# Created by https://www.gitignore.io/api/jupyternotebook,python,scala
+
+### JupyterNotebook ###
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Remove previous ipynb_checkpoints
+#   git rm -r .ipynb_checkpoints/
+#
+
+### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -70,7 +82,6 @@ docs/_build/
 target/
 
 # Jupyter Notebook
-.ipynb_checkpoints
 
 # pyenv
 .python-version
@@ -103,15 +114,25 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+### Python Patch ###
+.venv/
 
-# Created by https://www.gitignore.io/api/jupyternotebook
+### Python.VirtualEnv Stack ###
+# Virtualenv
+# http://iamzed.com/2009/05/07/a-primer-on-virtualenv/
+[Bb]in
+[Ii]nclude
+[Ll]ib
+[Ll]ib64
+[Ll]ocal
+[Ss]cripts
+pyvenv.cfg
+pip-selfcheck.json
 
-### JupyterNotebook ###
-.ipynb_checkpoints
-*/.ipynb_checkpoints/*
+### Scala ###
+*.class
 
-# Remove previous ipynb_checkpoints
-#   git rm -r .ipynb_checkpoints/
-#
 
-# End of https://www.gitignore.io/api/jupyternotebook
+# End of https://www.gitignore.io/api/jupyternotebook,python,scala
+data/
+non_spark_decode/out.json
