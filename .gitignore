@@ -136,3 +136,33 @@ pip-selfcheck.json
 # End of https://www.gitignore.io/api/jupyternotebook,python,scala
 data/
 non_spark_decode/out.json
+
+# Created by https://www.gitignore.io/api/sbt
+
+### SBT ###
+# Simple Build Tool
+# http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html#configuring-version-control
+
+scala/aisdecode/dist/*
+scala/aisdecode/target/
+scala/aisdecode/lib_managed/
+scala/aisdecode/src_managed/
+scala/aisdecode/project/boot/
+scala/aisdecode/project/plugins/project/
+scala/aisdecode/.history
+scala/aisdecode/.cache
+scala/aisdecode/.lib/
+
+
+# End of https://www.gitignore.io/api/sbt
+
+# Created by https://www.gitignore.io/api/ensime
+
+### Ensime ###
+# Ensime specific
+.ensime
+.ensime_cache/
+.ensime_lucene/
+
+
+# End of https://www.gitignore.io/api/ensime
