@@ -135,7 +135,6 @@ pip-selfcheck.json
 
 # End of https://www.gitignore.io/api/jupyternotebook,python,scala
 data/
-non_spark_decode/out.json
 
 # Created by https://www.gitignore.io/api/sbt
 
@@ -166,3 +165,7 @@ scala/aisdecode/.lib/
 
 
 # End of https://www.gitignore.io/api/ensime
+
+# No data!
+non_spark_decode/*.json
+**/*.dat
