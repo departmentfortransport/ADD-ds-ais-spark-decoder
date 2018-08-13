@@ -169,4 +169,3 @@ scala/aisdecode/.lib/
 # No data!
 non_spark_decode/*.json
 **/*.dat
-scala/aisdecode/testout/
