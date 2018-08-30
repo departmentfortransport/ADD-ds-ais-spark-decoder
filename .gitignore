@@ -167,6 +167,6 @@ scala/aisdecode/.lib/
 # End of https://www.gitignore.io/api/ensime
 
 # No data!
-non_spark_decode/*.json
+decoding/non_spark_decode/*.json
 **/*.dat
-scala/aisdecode/testout/
+decoding/scala/aisdecode/testout/
