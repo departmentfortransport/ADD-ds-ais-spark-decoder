@@ -86,7 +86,7 @@ The UIs are not exposed to the internet so you need to establish an SSH tunnel:
 # Create SSH  to dataproc cluster master
 gcloud compute ssh ais-dataproc-m \
     --project=dft-dst-prt-ais \
-    --zone=europe-west2-c  -- \
+    --zone=europe-west1-b  -- \
     -D 1080 -N
 ```
 
