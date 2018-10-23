@@ -9,6 +9,11 @@ lazy val root = (project in file(".")).
     name := "AisDecode",
     libraryDependencies ++= Seq(
        "org.apache.spark" %% "spark-sql" % "2.3.1",
-       "org.apache.spark" %% "spark-core" % "2.3.1"
+       "org.apache.spark" %% "spark-core" % "2.3.1",
+       "org.scalactic" %% "scalactic" % "3.0.5",
+       "org.scalatest" %% "scalatest" % "3.0.5" % "test",
+       "com.holdenkarau" %% "spark-testing-base" % "2.3.1_0.10.0" % "test"
     )
   )
+
+
