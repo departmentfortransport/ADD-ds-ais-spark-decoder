@@ -18,9 +18,16 @@ parsed = 0
 attempted = 0
 failed = 0
 failed_but_dont_care = 0
-ids_written = []
+ids_written = {}
 append_next = False
 five_part_1 = None
+
+# Keys to keep for msg types 123
+m123keys = [
+    'id', 'repeat_indicator', 'mmsi', 'nav_status', 'rot_over_range', 'rot',
+    'sog', 'position_accuracy', 'x', 'y', 'cog', 'true_heading', 'timestamp',
+    'special_manoeuvre', 'spare', 'raim', 'sync_state'
+]
 
 with open(input_file, 'r') as f:
     for line in f:
@@ -60,11 +67,17 @@ with open(input_file, 'r') as f:
             if data['id'] <= 3:
                 # Merge types 1,2,3 together - as they're the same really...
                 target_file = '123.csv'
+
+                # The output fields vary a bit, we only want the core AIS ones
+                # or it messes up the csv
+                unwanted = set(data.keys()) - set(m123keys)
+                for unwanted_key in unwanted:
+                    del data[unwanted_key]
+
             elif data['id'] == 24:
                 # Type 24 has parts A and B, so output to diff files
-                target_file = (str(data['id']) +
-                               '_' + str(data['part_num'])
-                               + '.csv')
+                target_file = (
+                    str(data['id']) + '_' + str(data['part_num']) + '.csv')
             else:
                 target_file = str(data['id']) + '.csv'
 
@@ -73,8 +86,16 @@ with open(input_file, 'r') as f:
                     t_write = csv.DictWriter(out_f, data.keys())
                     if target_file not in ids_written:
                         t_write.writeheader()
-                        ids_written.append(target_file)
-                    t_write.writerow(data)
+                        ids_written.update({target_file: len(data)})
+
+                    if len(data) != ids_written[target_file]:
+                        print(f"Error writing {target_file}" +
+                              f" Data had {len(data)} fields when" +
+                              f" {ids_written[target_file]} fields expected")
+
+                    else:
+                        t_write.writerow(data)
+
                     parsed += 1
 
         except Exception as e:
