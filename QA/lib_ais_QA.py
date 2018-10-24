@@ -62,8 +62,7 @@ with open(input_file, 'r') as f:
 
         try:
             data = ais.decode(raw_message, padding)  # Attempt the decode
-            data['rawInput'] = line.rstrip("\n")  # Append the raw data
-
+           
             if data['id'] <= 3:
                 # Merge types 1,2,3 together - as they're the same really...
                 target_file = '123.csv'
@@ -80,6 +79,8 @@ with open(input_file, 'r') as f:
                     str(data['id']) + '_' + str(data['part_num']) + '.csv')
             else:
                 target_file = str(data['id']) + '.csv'
+
+            data['rawInput'] = line.rstrip("\n")  # Append the raw data
 
             if data['id'] in types:
                 with open(target_file, 'a') as out_f:
