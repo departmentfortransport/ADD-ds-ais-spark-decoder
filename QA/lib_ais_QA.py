@@ -60,15 +60,20 @@ with open(input_file, 'r') as f:
             if data['id'] <= 3:
                 # Merge types 1,2,3 together - as they're the same really...
                 target_file = '123.csv'
+            elif data['id'] == 24:
+                # Type 24 has parts A and B, so output to diff files
+                target_file = (str(data['id']) +
+                               '_' + str(data['part_num'])
+                               + '.csv')
             else:
                 target_file = str(data['id']) + '.csv'
 
             if data['id'] in types:
                 with open(target_file, 'a') as out_f:
                     t_write = csv.DictWriter(out_f, data.keys())
-                    if data['id'] not in ids_written:
+                    if target_file not in ids_written:
                         t_write.writeheader()
-                        ids_written.append(data['id'])
+                        ids_written.append(target_file)
                     t_write.writerow(data)
                     parsed += 1
 
