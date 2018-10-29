@@ -154,4 +154,11 @@ object utils {
       }
 
 
+    /**
+      * Extract message type from binary string
+      */
+    def returnMessageType(as_binary: String): Int = {
+      Integer.parseInt(as_binary.slice(0,6), 2)
+    }
+
 }
