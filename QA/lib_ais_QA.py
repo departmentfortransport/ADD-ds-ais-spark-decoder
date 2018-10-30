@@ -1,4 +1,4 @@
-"""Slow python based decoder to output QA dataset"""
+"""Slow python based decoder to output QA dataset."""
 import csv
 import re
 
@@ -28,6 +28,40 @@ m123keys = [
     'sog', 'position_accuracy', 'x', 'y', 'cog', 'true_heading', 'timestamp',
     'special_manoeuvre', 'spare', 'raim', 'sync_state'
 ]
+
+m123_nav_status_lookup = {
+    1: "At anchor",
+    0: "Under way using engine",
+    2: "Not under command",
+    3: "Restricted manoeuverability",
+    4: "Constrained by her draught",
+    5: "Moored",
+    6: "Aground",
+    7: "Engaged in Fishing",
+    8: "Under way sailing",
+    9: "Reserved for future amendment of Navigational Status for HSC",
+    10: "Reserved for future amendment of Navigational Status for WIG",
+    11: "Reserved for future use",
+    12: "Reserved for future use",
+    14: "AIS-SART is active",
+    13: "Reserved for future use"
+}
+
+
+def bool2int(b):
+    """Convert Boolean to integer.
+
+    Parameters
+    ----------
+    b : boolean
+        True or False
+
+    """
+    if isinstance(b, bool):
+        return(int(b))
+    else:
+        return(b)
+
 
 with open(input_file, 'r') as f:
     for line in f:
@@ -62,9 +96,10 @@ with open(input_file, 'r') as f:
 
         try:
             data = ais.decode(raw_message, padding)  # Attempt the decode
-           
+
             if data['id'] <= 3:
-                # Merge types 1,2,3 together - as they're the same really...
+                # Merge types 1,2,3 together - as they're the same for our
+                # purposes
                 target_file = '123.csv'
 
                 # The output fields vary a bit, we only want the core AIS ones
@@ -73,6 +108,14 @@ with open(input_file, 'r') as f:
                 for unwanted_key in unwanted:
                     del data[unwanted_key]
 
+                # In Scala we map the nav_status to a string discription, so do
+                # this here too
+                data['nav_status'] = m123_nav_status_lookup[data['nav_status']]
+
+                #  A true heading of 511 should actually be reported as Null
+                if data['true_heading'] == 511:
+                    data['true_heading'] = None
+
             elif data['id'] == 24:
                 # Type 24 has parts A and B, so output to diff files
                 target_file = (
@@ -80,11 +123,20 @@ with open(input_file, 'r') as f:
             else:
                 target_file = str(data['id']) + '.csv'
 
-            data['rawInput'] = line.rstrip("\n")  # Append the raw data
+            # Convert any Bools to integers (as that's how they're handled in
+            # Scala)
+            data = {k: bool2int(v) for k, v in data.items()}
 
+            # Append the raw data
+            data['rawInput'] = line.rstrip("\n")
+
+            # Only write if we care about the message type
             if data['id'] in types:
                 with open(target_file, 'a') as out_f:
                     t_write = csv.DictWriter(out_f, data.keys())
+
+                    # Only write header if its the first time we're writing
+                    # this particular file type
                     if target_file not in ids_written:
                         t_write.writeheader()
                         ids_written.update({target_file: len(data)})
