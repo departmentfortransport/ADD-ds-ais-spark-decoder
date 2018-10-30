@@ -3,6 +3,7 @@ import csv
 import re
 
 import ais
+import numpy as np
 
 # Config
 types = [1, 2, 3, 5, 18, 24]
@@ -115,6 +116,27 @@ with open(input_file, 'r') as f:
                 #  A true heading of 511 should actually be reported as Null
                 if data['true_heading'] == 511:
                     data['true_heading'] = None
+
+                # LibAIS doesn't return NULL for ROT correctly, numbers higher
+                # than 720.1 must be NULL
+                if np.abs(data['rot']) > 720.1:
+                    data['rot'] = None
+
+                # Timestamp isn't handling nulls either, anything > 59 is null
+                if data["timestamp"] > 59:
+                    data['timestamp'] = None
+
+                if data["sog"] > 102.3: 
+                    data["sog"] = None
+
+                if data["x"] == 181.0:
+                    data["x"] = None
+ 
+                if data["y"] == 91.0:
+                    data["y"] = None
+
+                if data["cog"] == 260:
+                    data["cog"] = None
 
             elif data['id'] == 24:
                 # Type 24 has parts A and B, so output to diff files
