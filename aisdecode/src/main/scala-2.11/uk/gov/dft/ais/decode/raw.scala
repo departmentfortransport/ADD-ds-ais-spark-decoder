@@ -3,17 +3,15 @@ package uk.gov.dft.ais.decode
 // This add jar magic is useful when running in a notebook, it allows for the import of functions from this library.
 // %addJar file:///Users/willbowditch/projects/ds-ais/decode/aisdecode/target/scala-2.11/aisdecode_2.11-0.1.0.jar
 
-import uk.gov.dft.ais.decode.utils.{process_checksum, ais_to_binary,
-  TimestampParse, parseIntSafe}
-import org.apache.spark.sql.functions.{row_number, collect_list,
-  concat_ws, udf, _}
-import org.apache.spark.sql.types.{StructField, StructType, _}
-import org.apache.spark.sql.{Row, SaveMode, SparkSession, _}
-import org.apache.spark.sql._
+import java.sql.Timestamp
+
+import utils.{TimestampParse, ais_to_binary, process_checksum}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions.{collect_list, concat_ws, row_number, udf, _}
+
 import scala.util.Try
 import scala.util.matching.Regex
-import org.apache.spark.sql.expressions.Window
-import java.sql.Timestamp
 
 
 // Define a class for the raw data structure
@@ -38,11 +36,11 @@ object RawAISPacket{
   // Define the regex for the first part of the string.
   // Assuming this stays the same in future messages
   // sample: \s:ASM//Port=89//MMSI=2320706,c:1470182400*7E\
-  val regexMMSI = "(?<=MMSI=)\\d*".r
-  val regexTimestamp = "(?<=c:)\\d*".r
-  val regexPort = "(?<=Port=)\\d*".r
-  val regexS = "(?<=s:).*(?=\\/\\/P)".r
-  val regexChecksumMeta = "((?<=\\*)[\\d\\w]*)".r
+  val regexMMSI: Regex = "(?<=MMSI=)\\d*".r
+  val regexTimestamp: Regex = "(?<=c:)\\d*".r
+  val regexPort: Regex = "(?<=Port=)\\d*".r
+  val regexS: Regex = "(?<=s:).*(?=\\/\\/P)".r
+  val regexChecksumMeta: Regex = "((?<=\\*)[\\d\\w]*)".r
 
   def parseAISString(rawInputString: String): RawAISPacket = {
     // Split metadata!AIS packet
@@ -123,7 +121,7 @@ object rawdecode {
     val passed_checksum = lines.filter(v => process_checksum(v))
 
     // Parse AIS strings into a structure
-    val ds = lines.map(l => RawAISPacket.parseAISString(l)).toDS
+    val ds = passed_checksum.map(l => RawAISPacket.parseAISString(l)).toDS
 
     // Loop through and generate a unique ID for multi part messages
     // This method is tollerant of messages of any length and has been tested

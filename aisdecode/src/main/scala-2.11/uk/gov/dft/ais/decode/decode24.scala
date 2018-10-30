@@ -1,13 +1,11 @@
 package uk.gov.dft.ais.decode
 
-import org.apache.spark.sql.{SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
-import uk.gov.dft.ais.decode.utils.{extractInt, extractString, stringLength}
 
-// add the dependency
-// %addJar file:///Users/willbowditch/projects/ds-ais/decode/aisdecode/target/scala-2.11/aisdecode_2.11-0.1.0.jar
+import utils.{extractInt, parseIntWScale, stringLength, extractString}
 
-object decode24{
+object decode24 {
   /**
    * Decode type 24 messages
    * params 0 - read bucket location

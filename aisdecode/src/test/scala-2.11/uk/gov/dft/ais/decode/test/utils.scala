@@ -1,8 +1,9 @@
 package uk.gov.dft.ais.decode.test
+
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import uk.gov.dft.ais.decode.RawAISPacket
-import uk.gov.dft.ais.decode.utils.{ais_to_binary, returnMessageType}
+import uk.gov.dft.ais.decode.utils.{ais_to_binary, process_checksum, returnMessageType}
 
 object utils {
   def prepareQaData(spark: SparkSession, csv_location: String): (DataFrame, DataFrame) = {
@@ -20,8 +21,9 @@ object utils {
     // Get a starting dataset
     val messages = QA_data.select("rawInput").map(r => r.getString(0))
 
-    //
-    val ds = messages.map(l => RawAISPacket.parseAISString(l))
+    val passed_checksum = messages.filter(v => process_checksum(v))
+
+    val ds = passed_checksum.map(l => RawAISPacket.parseAISString(l))
 
     // Register UDFs for extracting data binary and tagging the id
     val binary_message_udf = udf(ais_to_binary _)
@@ -36,7 +38,7 @@ object utils {
     (QA_data, constructed_raw_data)
   }
 
-  def renameSelectMap(lookupMap: Map[String, String], dataFrame: DataFrame) = {
+  def renameSelectMap(lookupMap: Map[String, String], dataFrame: DataFrame): DataFrame = {
     val x: PartialFunction[String, Column] = {
       name: String => lookupMap.get(name) match {
         case Some(newname) => col(name).as(newname): Column

@@ -72,7 +72,7 @@ gcloud beta dataproc jobs submit spark \
   --project dft-dst-prt-ais \
   --region=europe-west1 \
   --jars gs://dft-dst-prt-ais-resources/aisdecode_2.11-0.1.0-SNAPSHOT.jar \
-  --class uk.gov.dft.ais.decode.decode5 \
+  --class decode5 \
   -- 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded' 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_mtype_5'
 ```
 

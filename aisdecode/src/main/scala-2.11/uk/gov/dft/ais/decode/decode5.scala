@@ -1,13 +1,11 @@
 package uk.gov.dft.ais.decode
 
-import org.apache.spark.sql.{SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
-import uk.gov.dft.ais.decode.utils.{extractInt, extractString}
 
-// add the dependency
-// %addJar file:///Users/willbowditch/projects/ds-ais/scala/aisdecode/target/scala-2.11/aisdecode_2.11-0.1.0-SNAPSHOT.jar
+import utils.{extractInt, extractString}
 
-object decode5{
+object decode5 {
   /**
    * Decode type 5 messages
    * params 0 - read bucket location
@@ -106,7 +104,7 @@ object decode5{
     val getDraught = udf [Option[Double] , String] {x=>
       // Meters/10
       extractInt(x,294,302) match {
-        case Some(i) => {Some(i / 10)}
+        case Some(i) => Some(i / 10)
         case None => None
       }
     }

@@ -1,16 +1,12 @@
 package uk.gov.dft.ais.decode
 
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.functions.{max, min}
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import utils.{extractInt, parseIntWScale, stringLength}
 
 import scala.math.{abs, pow}
-import uk.gov.dft.ais.decode.utils.{extractInt, extractString, parseIntWScale, stringLength}
 
-// add the dependency
-// %addJar file:///Users/willbowditch/projects/ds-ais/decode/aisdecode/target/scala-2.11/aisdecode_2.11-0.1.0.jar
-
-object decode123{
+object decode123 {
   /**
    * Decode type 5 messages
    * params 0 - read bucket location
@@ -30,7 +26,6 @@ object decode123{
       .getOrCreate()
 
     // this import has to go after val spark.
-    import spark.implicits._
 
     // Read in the parquet files from first argument location
     val binary_decoded_messages = spark
@@ -114,10 +109,9 @@ object decode123{
       // West \= negative. A value of 181 degrees (0x6791AC0 hex) indicates
       // that longitude is not available and is the default.
       parseIntWScale(x.slice(61,89)) match {
-        case Some(i) => {
+        case Some(i) =>
           val long = i / 600000.0
           if (long == 181){None}else{Some(long)}
-        }
         case None => None
       }
     }
@@ -128,10 +122,9 @@ object decode123{
       // South = negative. A value of 91 degrees (0x3412140 hex)
       // indicates latitude is not available and is the default.
       parseIntWScale(x.slice(89,116)) match {
-        case Some(i) => {
+        case Some(i) =>
           val long = i / 600000.0
           if (long == 91){None}else{Some(long)}
-        }
         case None => None
       }
     }
@@ -141,7 +134,7 @@ object decode123{
       // Course over ground will be 3600 (0xE10) if that data is not available.
       // Relative to true north, to 0.1 degree precision
       extractInt(x,116,128) match {
-        case Some(i) => {if(i == 2600){None}else{Some(i/10.0)}}
+        case Some(i) => if(i == 2600){None}else{Some(i/10.0)}
         case None => None
       }
     }

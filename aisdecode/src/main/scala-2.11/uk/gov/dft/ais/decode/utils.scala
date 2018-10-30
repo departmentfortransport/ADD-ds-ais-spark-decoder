@@ -1,11 +1,12 @@
 package uk.gov.dft.ais.decode
 
-import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.types.{StructField, StructType, _}
-import org.apache.spark.sql.{Row, SaveMode, SparkSession}
-import scala.util.Try
-import scala.math.pow
 import java.sql.Timestamp
+
+import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions.udf
+
+import scala.math.pow
+import scala.util.Try
 
 object utils {
   /**
@@ -43,7 +44,7 @@ object utils {
       // split the string into 6 bit chunks
       .split("(?<=\\G.{6})")
       // convert binary to Ints
-      .map(c => (Integer.parseInt(c, 2)))
+      .map(c => Integer.parseInt(c, 2))
       // impliment conversion of strange 6bit ASCII
       .map {case i if i <= 31 => i + 64;
             case i if i>31 => i;
@@ -52,17 +53,17 @@ object utils {
       .map {i => i.toChar}.mkString
   }
 
-  /**
+   /**
    * Calculate the XOR checksum for AIS arrays.
    * [stringChecksumPair An array of the form [String, Checksum]]
    * Returns boolean True (checksum match) or False
    */
    def validate_ais_checksum(stringChecksumPair: Array[String]): Boolean =
      stringChecksumPair match {
-       case Array(string, checksum_match) => {
+       case Array(string, checksum_match) =>
          var checksum = 0
          // Map over the string performing XOR checksum calculation
-         string.map{ char => checksum = checksum ^ char.toInt }
+         string.map{  char => checksum = checksum ^ char.toInt }
          if( f"$checksum%02X".toUpperCase == checksum_match.toUpperCase){
            true //Checksum matches!
          } else {
@@ -72,7 +73,6 @@ object utils {
              For string: $string""")
            false //Checksum doesn't match
          }
-       }
        case _ => {println("Error! Not an array!"); false}
      }
 
@@ -149,7 +149,7 @@ object utils {
     /**
      * Quick string length udf
      */
-    val stringLength = udf [Int, String] {
+    val stringLength: UserDefinedFunction = udf [Int, String] {
       x => x.length()
       }
 

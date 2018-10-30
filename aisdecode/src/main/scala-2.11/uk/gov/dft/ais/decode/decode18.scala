@@ -1,20 +1,15 @@
 package uk.gov.dft.ais.decode
 
-import org.apache.spark.sql.{SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.functions.{min, max}
-import scala.math.{abs, pow}
-import uk.gov.dft.ais.decode.utils.{extractInt, extractString, parseIntWScale,
-  stringLength}
 
-// add the dependency
-// %addJar file:///Users/willbowditch/projects/ds-ais/decode/aisdecode/target/scala-2.11/aisdecode_2.11-0.1.0.jar
+import utils.{stringLength, extractInt, parseIntWScale}
 
-object decode18{
+object decode18 {
   /**
    * Decode type 5 messages
    * params 0 - read bucket location
-   * parms 1 - write bucket location (parquet file)
+   * params 1 - write bucket location (parquet file)
    */
   def main (args:Array[String]): Unit = {
 
@@ -75,10 +70,9 @@ object decode18{
       // West \= negative. A value of 181 degrees (0x6791AC0 hex) indicates
       // that longitude is not available and is the default.
       parseIntWScale(x.slice(57,85)) match {
-        case Some(i) => {
+        case Some(i) =>
           val long = i / 600000.0
           if (long == 181){None}else{Some(long)}
-        }
         case None => None
       }
     }
@@ -89,10 +83,9 @@ object decode18{
       // South = negative. A value of 91 degrees (0x3412140 hex)
       // indicates latitude is not available and is the default.
       parseIntWScale(x.slice(85,112)) match {
-        case Some(i) => {
+        case Some(i) =>
           val long = i / 600000.0
           if (long == 91){None}else{Some(long)}
-        }
         case None => None
       }
     }
