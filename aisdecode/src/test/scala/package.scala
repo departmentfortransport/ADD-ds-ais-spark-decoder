@@ -1,30 +1,33 @@
 package uk.gov.dft.ais.decode.test
 
-import com.holdenkarau.spark.testing.{DataFrameSuiteBase, SharedSparkContext}
-import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import com.holdenkarau.spark.testing.DataFrameSuiteBase
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.scalatest._
-import uk.gov.dft.ais.decode.RawAISPacket
 import uk.gov.dft.ais.decode.decode123.transform
-import uk.gov.dft.ais.decode.utils.{ais_to_binary, returnMessageType}
-import uk.gov.dft.ais.decode.test.utils.prepare_qa_data
+import uk.gov.dft.ais.decode.test.utils.{prepareQaData, renameSelectMap}
 
 
 
-class TestDecode123 extends FunSuite with DataFrameSuiteBase {
+class TestDecode123 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
 
-  test("Get repeat"){
+  var renamed_selected: DataFrame = _
+  var dataTargetSelected: DataFrame = _
 
+  before {
     // Configure implicits
     val spark = SparkSession.builder().getOrCreate()
     import spark.implicits._
 
-    val (dataTarget, dataIn) = prepare_qa_data(spark,
+    // Grab the QA csv
+    val (dataTarget, dataIn) = prepareQaData(spark,
       "/Users/willbowditch/projects/ds-ais/QA/123.csv")
 
+    // Apply the transformation used in the main script
     val dataOut = transform(spark, dataIn)
 
-    // Rehshape the dataOut so if looks like our QA set
+    // Generate a map to rename and select columns (oldname -> newname)
     val lookup = Map[String, String](
       "id" -> "id",
       "decoded_repeate" -> "repeat_indicator",
@@ -42,30 +45,41 @@ class TestDecode123 extends FunSuite with DataFrameSuiteBase {
       "speed_over_ground" -> "sog"
     )
 
-    // Map to rename and select columns
-    val x: PartialFunction[String, Column] = {
-       name: String => lookup.get(name) match {
-        case Some(newname) => col(name).as(newname): Column
-      }
-    }
-
-    // Apply the above PartialFunction
-    val cols = dataOut.columns.collect{x}
-    val renamed_selected = dataOut.select(cols: _*)
+    // Apply the above map to the dataframe
+    renamed_selected= renameSelectMap(lookup, dataOut)
 
 
     // Select only column names in renamed_selected for comparison
-    val dataTargetSelected = dataTarget.select(renamed_selected.columns.map(m => col(m)): _*)
+    dataTargetSelected = dataTarget.select(renamed_selected.columns.map(m => col(m)): _*)
 
-    println("Data from Scala")
+    println("Data from Spark decoder")
+    renamed_selected.printSchema()
     renamed_selected.show()
 
-    println("Data from python libais")
+
+    println("Data from QA dataset")
+    dataTargetSelected.printSchema()
     dataTargetSelected.show()
+  }
 
-    assertDataFrameApproximateEquals(dataTarget, renamed_selected, 0)
+  test("Test 123 lat longs are very similar") {
 
-    println("BREAK!")
+//    val spark = SparkSession.builder().getOrCreate()
+//    import spark.implicits._
+
+    // Apply more stringent checks to lat and long, as they're most important
+    assertDataFrameApproximateEquals(
+      dataTargetSelected.select("x", "y"),
+      renamed_selected.select("x", "y"),
+      .000000001
+    )
+  }
+
+  test("Test 123 Decoding matches QA dataset"){
+
+    // Check that dataframeas are approximately equal
+    assertDataFrameApproximateEquals(dataTargetSelected, renamed_selected, .001)
+
 
   }
 }

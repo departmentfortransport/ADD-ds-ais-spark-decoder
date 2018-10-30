@@ -16,7 +16,7 @@ lazy val root = (project in file(".")).
        "org.apache.spark" %% "spark-hive" % "2.3.1" % "test"
     ),
     fork in Test := true,
-    javaOptions ++= Seq("-Xms512M", "-Xmx2048M", "-XX:MaxPermSize=2048M", "-XX:+CMSClassUnloadingEnabled"),
+    javaOptions ++= Seq("-Xms512M", "-Xmx2048M", "-XX:+CMSClassUnloadingEnabled"),
     parallelExecution in Test := false
   )
 
