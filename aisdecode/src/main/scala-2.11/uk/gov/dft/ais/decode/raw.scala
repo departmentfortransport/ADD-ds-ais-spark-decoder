@@ -60,7 +60,7 @@ object RawAISPacket{
      */
     def someStringParse(s: Option[String]): Option[Int] = {
       try{Some(Integer.parseInt(s.get.trim))}catch{
-        case e: Exception => None}
+        case _: Exception => None}
     }
 
     /**

@@ -11,13 +11,11 @@ class Checksum  extends FunSuite {
     "!AIVDM,1,1,,A,13aEOK?P00PD2wVMdLDRhgvL289?,0*28"
 
   test("Correct checksums pass") {
-    assert(process_checksum(should_pass) == true)
+    assert(process_checksum(should_pass))
   }
 
   test("Incorrect checksums fail"){
-    assert(process_checksum(should_fail) == false)
+    assert(!process_checksum(should_fail))
   }
 
-
-  
 }

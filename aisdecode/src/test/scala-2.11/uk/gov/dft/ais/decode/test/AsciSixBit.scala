@@ -73,7 +73,7 @@ class AsciSixBit extends FunSuite {
 
   test("Test 6 bit asci conversion matches table"){
     alphabet.foreach{
-      case List(binaryString: String, id: Int, targetString: String) =>
+      case List(binaryString: String, _: Int, targetString: String) =>
         assert(ais_6bit_asci(binaryString) === targetString)
     }
   }

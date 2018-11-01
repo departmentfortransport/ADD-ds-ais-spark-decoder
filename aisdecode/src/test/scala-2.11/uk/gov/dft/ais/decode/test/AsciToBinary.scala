@@ -75,8 +75,8 @@ class AsciToBinary extends FunSuite {
     table.foreach{
       case List(
         encodedLetter: String,
-        asci: Int,
-        decimal: Int,
+        _: Int,
+        _: Int,
         binary: String
       ) => assert(ais_to_binary(encodedLetter) === binary)
     }
