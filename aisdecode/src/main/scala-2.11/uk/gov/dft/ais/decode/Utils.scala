@@ -142,8 +142,8 @@ object Utils {
      * Convenience function to safely slice a string and convert from 6bit asci
      */
     def extractString(input: String, start: Int, end: Int): Option [String] = {
-      val safe_start = if(input.length < start){input.length}else{start}
-      val safe_end = if(input.length < end){input.length}else{end}
+      val safe_start = if(input.length < start){input.length} else start
+      val safe_end = if(input.length < end){input.length} else end
       Try(ais_6bit_asci(input.slice(safe_start, safe_end))).toOption
     }
 
