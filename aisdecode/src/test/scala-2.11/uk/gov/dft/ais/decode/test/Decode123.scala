@@ -15,7 +15,7 @@ class Decode123 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
   var matchedQaData: DataFrame = _
 
   before {
-    // Configure implicits
+    // Configure spark
     val spark = SparkSession.builder().getOrCreate()
 
     // Grab the QA csv
@@ -62,7 +62,7 @@ class Decode123 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
     matchedQaData.show()
   }
 
-  test("Test msg123 lat longs equal to ten decimal points") {
+  test("Msg123 lat longs equal to ten decimal points") {
     // Apply more stringent checks to lat and long floats, as they're most important
     assertDataFrameApproximateEquals(
       matchedQaData.select("x", "y"),
@@ -71,7 +71,7 @@ class Decode123 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
     )
   }
 
-  test("Test that msg123 data frame is same as QA data frame (to 3 decimal points for floats) "){
+  test("Msg123 data frame is same as QA data frame (to 3 decimal points for floats) "){
     // Check that data frames are approximately equal
     assertDataFrameApproximateEquals(matchedQaData, matchedSparkDecodedData, .001)
   }
