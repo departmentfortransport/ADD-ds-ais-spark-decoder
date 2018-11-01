@@ -8,7 +8,7 @@ import org.apache.spark.sql.functions.udf
 import scala.math.pow
 import scala.util.Try
 
-object utils {
+object Utils {
   /**
    * The data payload is an ASCII-encoded bit vector.
    * Each character represents six bits of data.
@@ -53,17 +53,18 @@ object utils {
       .map {i => i.toChar}.mkString
   }
 
-   /**
-   * Calculate the XOR checksum for AIS arrays.
-   * [stringChecksumPair An array of the form [String, Checksum]]
-   * Returns boolean True (checksum match) or False
-   */
+
+  /**
+    * Calculate the XOR checksum for AIS arrays.
+    * @param stringChecksumPair An array of the form [String, Checksum]
+    * @return boolean True (checksum match) or False
+    */
    def validate_ais_checksum(stringChecksumPair: Array[String]): Boolean =
      stringChecksumPair match {
        case Array(string, checksum_match) =>
          var checksum = 0
          // Map over the string performing XOR checksum calculation
-         string.map{  char => checksum = checksum ^ char.toInt }
+         string.foreach{  char => checksum = checksum ^ char.toInt }
          if( f"$checksum%02X".toUpperCase == checksum_match.toUpperCase){
            true //Checksum matches!
          } else {
@@ -73,7 +74,7 @@ object utils {
              For string: $string""")
            false //Checksum doesn't match
          }
-       case _ => {println("Error! Not an array!"); false}
+       case _ => println("Error! Not an array!"); false
      }
 
 

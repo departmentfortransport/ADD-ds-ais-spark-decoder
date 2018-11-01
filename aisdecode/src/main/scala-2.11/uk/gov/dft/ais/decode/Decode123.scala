@@ -2,11 +2,12 @@ package uk.gov.dft.ais.decode
 
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import utils.{extractInt, parseIntWScale, stringLength}
+import Utils.{extractInt, parseIntWScale, stringLength}
 
 import scala.math.{abs, pow}
 
-object decode123 {
+//noinspection ScalaUnusedSymbol
+object Decode123 {
   /**
    * Decode type 5 messages
    * params 0 - read bucket location
@@ -163,6 +164,7 @@ object decode123 {
       extractInt(x,143,145)
     }
 
+    //noinspection ScalaUnusedSymbol
     // This one isn't used at the moment, but here for reference of bit locations
     val getSpare = udf [Option[Int] , String] (x=> extractInt(x,145,148))
 

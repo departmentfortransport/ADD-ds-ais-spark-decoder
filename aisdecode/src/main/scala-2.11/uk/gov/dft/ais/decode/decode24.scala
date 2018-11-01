@@ -3,7 +3,7 @@ package uk.gov.dft.ais.decode
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
 
-import utils.{extractInt, parseIntWScale, stringLength, extractString}
+import Utils.{extractInt, parseIntWScale, stringLength, extractString}
 
 object decode24 {
   /**

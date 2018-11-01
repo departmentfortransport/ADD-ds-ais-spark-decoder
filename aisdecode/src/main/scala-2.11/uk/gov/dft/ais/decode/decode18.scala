@@ -3,7 +3,7 @@ package uk.gov.dft.ais.decode
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.udf
 
-import utils.{stringLength, extractInt, parseIntWScale}
+import Utils.{stringLength, extractInt, parseIntWScale}
 
 object decode18 {
   /**
@@ -11,6 +11,7 @@ object decode18 {
    * params 0 - read bucket location
    * params 1 - write bucket location (parquet file)
    */
+  //noinspection ScalaUnusedSymbol
   def main (args:Array[String]): Unit = {
 
     // Start a spark context

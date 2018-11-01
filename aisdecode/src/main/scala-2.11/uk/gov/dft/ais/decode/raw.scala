@@ -5,7 +5,7 @@ package uk.gov.dft.ais.decode
 
 import java.sql.Timestamp
 
-import utils.{TimestampParse, ais_to_binary, process_checksum}
+import Utils.{TimestampParse, ais_to_binary, process_checksum}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{collect_list, concat_ws, row_number, udf, _}
@@ -126,11 +126,11 @@ object rawdecode {
     // Loop through and generate a unique ID for multi part messages
     // This method is tollerant of messages of any length and has been tested
     // on messages between 1-3 sentences.
-    var window = Window
+    val window = Window
       .partitionBy($"mmsi", $"timestamp", $"fragmentCount")
       .orderBy("fragmentCount")
 
-    var multi_part_messages_with_index = ds
+    val multi_part_messages_with_index = ds
       .withColumn("GeneratedID", $"fragmentN" - row_number.over(window))
 
     // Using the unique ID generated above, merge the messages by concatinating
