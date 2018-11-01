@@ -4,8 +4,8 @@ import com.holdenkarau.spark.testing.DataFrameSuiteBase
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest._
-import uk.gov.dft.ais.decode.decode123.transform
-import uk.gov.dft.ais.decode.test.utils.{prepareQaData, renameSelectMap}
+import uk.gov.dft.ais.decode.Decode123.transform
+import uk.gov.dft.ais.decode.test.TestUtils.{prepareQaData, renameSelectMap}
 
 
 

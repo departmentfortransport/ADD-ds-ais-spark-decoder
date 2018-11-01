@@ -3,9 +3,9 @@ package uk.gov.dft.ais.decode.test
 import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 import uk.gov.dft.ais.decode.RawAISPacket
-import uk.gov.dft.ais.decode.utils.{ais_to_binary, process_checksum, returnMessageType}
+import uk.gov.dft.ais.decode.Utils.{ais_to_binary, process_checksum, returnMessageType}
 
-object utils {
+object TestUtils {
   def prepareQaData(spark: SparkSession, csv_location: String): (DataFrame, DataFrame) = {
 
     import spark.implicits._
