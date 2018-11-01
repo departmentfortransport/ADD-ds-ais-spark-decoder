@@ -89,6 +89,13 @@ with open(input_file, 'r') as f:
             raw_message = five_part_1 + raw_message
             padding = 2  # This seems to always be 2 in this case
             append_next = False
+            
+            # We need the whole message to validate the decoder
+            # so replace the message on the shorter string. 
+            # Note this does mean that checksums will fail.
+            deconstructed_line = line.split(',')
+            deconstructed_line[6] = raw_message
+            line = ','.join(deconstructed_line)
 
         # Workaround for message types 24. Padding is incorrectly calculated
         # from the above
