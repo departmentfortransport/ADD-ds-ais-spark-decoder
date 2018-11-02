@@ -21,9 +21,9 @@ object TestUtils {
     // Get a starting dataset
     val messages = QA_data.select("rawInput").map(r => r.getString(0))
 
-    val passed_checksum = messages.filter(v => process_checksum(v))
+//    val passed_checksum =  messages.filter(v => process_checksum(v))
 
-    val ds = passed_checksum.map(l => RawAISPacket.parseAISString(l))
+    val ds = messages.map(l => RawAISPacket.parseAISString(l))
 
     // Register UDFs for extracting data binary and tagging the id
     val binary_message_udf = udf(ais_to_binary _)
