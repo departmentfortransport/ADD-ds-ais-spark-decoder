@@ -29,9 +29,6 @@ class Decode5 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
     // Apply transformation used in main script
     val dataOut = transform(spark, dataIn)
 
-    dataIn.show()
-    dataTarget.show()
-
     // Generate map to rename and select columns (old name -> new name)
     val lookup = Map[String, String](
       "id" -> "id",
@@ -59,7 +56,9 @@ class Decode5 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
     // Apply the above map to the data frame
     matchedSparkDecodedData = renameSelectMap(lookup, dataOut)
 
-    // Apply the fix to string columns
+    // Apply a fix to string columns. libais (our QA decoder) converts some
+    // strings to _ instead of their actual value. This function replicates
+    // that behaviour so the dataframes match up.
     val stringFixUDF = udf(normaliseStringsLibAis _)
     matchedSparkDecodedData = matchedSparkDecodedData
         .withColumn("destination", stringFixUDF($"destination"))
@@ -69,7 +68,6 @@ class Decode5 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
     matchedQAData = dataTarget.select(
       matchedSparkDecodedData.columns.map(m => col(m)): _*
     )
-
 
     println("Data from Spark decoder")
     matchedSparkDecodedData.printSchema()
