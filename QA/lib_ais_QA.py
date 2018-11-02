@@ -59,9 +59,36 @@ def bool2int(b):
 
     """
     if isinstance(b, bool):
-        return(int(b))
+        return (int(b))
     else:
-        return(b)
+        return (b)
+
+
+def stringcorrection(s):
+    """Replace strings that are not handled correctly.
+
+    Parameters
+    ----------
+    s : String, only replaced if encountered
+
+    """
+    if isinstance(s, str):
+        return (s.replace('`', '\''))
+    else:
+        return (s)
+
+
+def corrections(x):
+    """Collect together the various corrections applied to the whole dict.
+
+    Parameters
+    ----------
+    x : any non iterable
+
+    """
+    x = bool2int(x)
+    x = stringcorrection(x)
+    return (x)
 
 
 with open(input_file, 'r') as f:
@@ -89,9 +116,9 @@ with open(input_file, 'r') as f:
             raw_message = five_part_1 + raw_message
             padding = 2  # This seems to always be 2 in this case
             append_next = False
-            
+
             # We need the whole message to validate the decoder
-            # so replace the message on the shorter string. 
+            # so replace the message on the shorter string.
             # Note this does mean that checksums will fail.
             deconstructed_line = line.split(',')
             deconstructed_line[6] = raw_message
@@ -104,6 +131,8 @@ with open(input_file, 'r') as f:
 
         try:
             data = ais.decode(raw_message, padding)  # Attempt the decode
+
+            target_file = str(data['id']) + '.csv'
 
             if data['id'] <= 3:
                 # Merge types 1,2,3 together - as they're the same for our
@@ -133,28 +162,40 @@ with open(input_file, 'r') as f:
                 if data["timestamp"] > 59:
                     data['timestamp'] = None
 
-                if data["sog"] > 102.3: 
+                if data["sog"] > 102.3:
                     data["sog"] = None
 
                 if data["x"] == 181.0:
                     data["x"] = None
- 
+
                 if data["y"] == 91.0:
                     data["y"] = None
 
                 if data["cog"] == 260:
                     data["cog"] = None
 
+            elif data['id'] == 5:
+                # Add propper null handling for eta data
+                if data['eta_month'] == 0:
+                    data['eta_month'] = None
+
+                if data['eta_day'] == 0:
+                    data['eta_day'] = None
+
+                if data['eta_hour'] == 24:
+                    data['eta_hour'] = None
+
+                if data['eta_minute'] == 60:
+                    data['eta_minute'] = None
+
             elif data['id'] == 24:
                 # Type 24 has parts A and B, so output to diff files
                 target_file = (
                     str(data['id']) + '_' + str(data['part_num']) + '.csv')
-            else:
-                target_file = str(data['id']) + '.csv'
 
             # Convert any Bools to integers (as that's how they're handled in
             # Scala)
-            data = {k: bool2int(v) for k, v in data.items()}
+            data = {k: corrections(v) for k, v in data.items()}
 
             # Append the raw data
             data['rawInput'] = line.rstrip("\n")

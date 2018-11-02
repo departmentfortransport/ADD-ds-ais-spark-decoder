@@ -2,7 +2,7 @@ package uk.gov.dft.ais.decode
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.udf
-import Utils.{extractInt, extractString}
+import Utils.{extractInt, extractString, parseIntWScale}
 
 object Decode5 {
   /**
@@ -104,8 +104,8 @@ object Decode5 {
 
     val getDraught = udf [Option[Double] , String] {x=>
       // Meters/10
-      extractInt(x,294,302) match {
-        case Some(i) => Some(i / 10)
+      extractInt(x, 294,302) match {
+        case Some(i) => Some(i / 10.0)
         case None => None
       }
     }

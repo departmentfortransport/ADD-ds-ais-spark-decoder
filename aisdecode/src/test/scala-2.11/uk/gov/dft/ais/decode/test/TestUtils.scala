@@ -6,7 +6,7 @@ import uk.gov.dft.ais.decode.RawAISPacket
 import uk.gov.dft.ais.decode.Utils.{ais_to_binary, process_checksum, returnMessageType}
 
 object TestUtils {
-  def prepareQaData(spark: SparkSession, csv_location: String): (DataFrame, DataFrame) = {
+  def prepareQaData(spark: SparkSession, csv_location: String, testChecksum: Boolean = true): (DataFrame, DataFrame) = {
 
     import spark.implicits._
 
@@ -21,7 +21,12 @@ object TestUtils {
     // Get a starting dataset
     val messages = QA_data.select("rawInput").map(r => r.getString(0))
 
-//    val passed_checksum =  messages.filter(v => process_checksum(v))
+    val passed_checksum =  if(testChecksum){
+      messages.filter(v => process_checksum(v))
+    } else {
+      println("Not checking checksums are valid")
+      messages
+    }
 
     val ds = messages.map(l => RawAISPacket.parseAISString(l))
 
@@ -49,6 +54,15 @@ object TestUtils {
     val cols = dataFrame.columns.collect{x}
 
     dataFrame.select(cols: _*)
+  }
+
+  def normaliseStringsLibAis(s: String): String = {
+    val stringsToReplace = Array("-", "_")
+
+    val regexString = stringsToReplace.mkString(sep = "|")
+
+    s.replaceAll("_", "-")
+
   }
 
 }
