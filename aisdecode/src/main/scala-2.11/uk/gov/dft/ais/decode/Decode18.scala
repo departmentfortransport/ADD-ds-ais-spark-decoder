@@ -152,9 +152,9 @@ object Decode18 {
 
     // For each UDF run it on the dataset.
     msg_18_raw
-      .withColumn("decoded_repeat",
+      .withColumn("repeat_indicator",
         getRepeat(msg_18_raw("dataBinary")))
-      .withColumn("decoded_mmsi",
+      .withColumn("mmsi",
         getMMSI(msg_18_raw("dataBinary")))
       .withColumn("speed_over_ground",
         getSOG(msg_18_raw("dataBinary")))

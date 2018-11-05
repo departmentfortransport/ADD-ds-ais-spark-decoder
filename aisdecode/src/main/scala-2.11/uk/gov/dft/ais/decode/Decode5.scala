@@ -49,7 +49,7 @@ object Decode5 {
 
     val getMMSI = udf [Option[Int] , String] (x=> extractInt(x,8,38))
 
-    val getAISVersion = udf [Option[Int] , String] (x=> extractInt(x,38,40))
+    val getais_version = udf [Option[Int] , String] (x=> extractInt(x,38,40))
 
     val getIMO = udf [Option[Int] , String] (x=> extractInt(x, 40,70))
 
@@ -131,24 +131,24 @@ object Decode5 {
 
     // For each UDF run it on the dataset.
     msg_5_raw
-      .withColumn("decoded_repeate", getRepeat(msg_5_raw("dataBinary")))
-      .withColumn("decoded_MMSI", getMMSI(msg_5_raw("dataBinary")))
-      .withColumn("aisVersion", getAISVersion(msg_5_raw("dataBinary")))
-      .withColumn("IMO", getIMO(msg_5_raw("dataBinary")) )
-      .withColumn("callSign", getCallSign(msg_5_raw("dataBinary")))
-      .withColumn("shipName", getShipName(msg_5_raw("dataBinary")))
-      .withColumn("shipType", getShipType(msg_5_raw("dataBinary")))
+      .withColumn("repeat_indicator", getRepeat(msg_5_raw("dataBinary")))
+      .withColumn("mmsi", getMMSI(msg_5_raw("dataBinary")))
+      .withColumn("ais_version", getais_version(msg_5_raw("dataBinary")))
+      .withColumn("imo", getIMO(msg_5_raw("dataBinary")) )
+      .withColumn("call_sign", getCallSign(msg_5_raw("dataBinary")))
+      .withColumn("ship_name", getShipName(msg_5_raw("dataBinary")))
+      .withColumn("type_and_cargo", getShipType(msg_5_raw("dataBinary")))
       .withColumn("to_bow", getToBow(msg_5_raw("dataBinary")))
       .withColumn("to_stern", getToStern(msg_5_raw("dataBinary")))
       .withColumn("to_port", getToPort(msg_5_raw("dataBinary")))
       .withColumn("to_starboard", getToStarboard(msg_5_raw("dataBinary")))
       .withColumn("epfd", getPosFixType(msg_5_raw("dataBinary")))
-      .withColumn("ETA_month", getETAmonth(msg_5_raw("dataBinary")))
-      .withColumn("ETA_day", getETAday(msg_5_raw("dataBinary")))
-      .withColumn("ETA_hour", getETAhour(msg_5_raw("dataBinary")))
-      .withColumn("ETA_min", getETAmin(msg_5_raw("dataBinary")))
-      .withColumn("Draught", getDraught(msg_5_raw("dataBinary")))
-      .withColumn("Dest", getDestination(msg_5_raw("dataBinary")))
-      .withColumn("DTE", getDataTerminalReady(msg_5_raw("dataBinary")))
+      .withColumn("eta_month", getETAmonth(msg_5_raw("dataBinary")))
+      .withColumn("eta_day", getETAday(msg_5_raw("dataBinary")))
+      .withColumn("eta_hour", getETAhour(msg_5_raw("dataBinary")))
+      .withColumn("eta_min", getETAmin(msg_5_raw("dataBinary")))
+      .withColumn("draught", getDraught(msg_5_raw("dataBinary")))
+      .withColumn("destination", getDestination(msg_5_raw("dataBinary")))
+      .withColumn("data_terminal_ready", getDataTerminalReady(msg_5_raw("dataBinary")))
   }
 }

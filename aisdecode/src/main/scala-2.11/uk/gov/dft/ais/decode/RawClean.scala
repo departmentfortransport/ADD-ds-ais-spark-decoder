@@ -14,9 +14,9 @@ object RawClean {
     df.drop(
       "dataBinary",
       "data",
-      "packetType",
-      "fragmentCount",
-      "radioChannel",
+      "packet_type",
+      "fragment_count",
+      "radio_channel",
       "padding",
       "s"
     )

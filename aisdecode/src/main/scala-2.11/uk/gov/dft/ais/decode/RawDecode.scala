@@ -54,23 +54,23 @@ object RawDecode {
     // This method is tollerant of messages of any length and has been tested
     // on messages between 1-3 sentences.
     val window = Window
-      .partitionBy($"mmsi", $"timestamp", $"fragmentCount")
-      .orderBy("fragmentCount")
+      .partitionBy($"port_mmsi", $"timestamp", $"fragment_count")
+      .orderBy("fragment_count")
 
     val multi_part_messages_with_index = ds
-      .withColumn("GeneratedID", $"fragmentN" - row_number.over(window))
+      .withColumn("GeneratedID", $"fragment_n" - row_number.over(window))
 
     // Using the unique ID generated above, merge the messages by concatinating
     // the strings
     val merged_messages = multi_part_messages_with_index
       .groupBy(
-        "packetType",
-        "fragmentCount",
-        "radioChannel",
+        "packet_type",
+        "fragment_count",
+        "radio_channel",
         "padding",
         "s",
         "port",
-        "mmsi",
+        "port_mmsi",
         "timestamp",
         "GeneratedID")
       .agg(concat_ws("", collect_list("data")) as "data")

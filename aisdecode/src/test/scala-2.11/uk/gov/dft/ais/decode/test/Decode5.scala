@@ -32,25 +32,25 @@ class Decode5 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
     // Generate map to rename and select columns (old name -> new name)
     val lookup = Map[String, String](
       "id" -> "id",
-    "decoded_repeate" -> "repeat_indicator",
-    "decoded_MMSI" -> "mmsi",
-    "aisVersion" -> "ais_version",
-    "IMO" -> "imo_num",
-    "callSign" -> "callsign",
-    "shipName" -> "name",
-    "shipType" -> "type_and_cargo",
+    "repeat_indicator" -> "repeat_indicator",
+    "mmsi" -> "mmsi",
+    "ais_version" -> "ais_version",
+    "imo" -> "imo_num",
+    "call_sign" -> "callsign",
+    "ship_name" -> "name",
+    "type_and_cargo" -> "type_and_cargo",
     "to_bow" -> "dim_a",
     "to_stern" -> "dim_b",
     "to_port" -> "dim_c",
     "to_starboard" -> "dim_d",
     "epfd" -> "fix_type",
-    "ETA_month" -> "eta_month",
-    "ETA_day" -> "eta_day",
-    "ETA_hour" -> "eta_hour",
-    "ETA_min" -> "eta_minute",
-    "Draught" -> "draught",
-    "Dest" -> "destination",
-    "DTE" -> "dte"
+    "eta_month" -> "eta_month",
+    "eta_day" -> "eta_day",
+    "eta_hour" -> "eta_hour",
+    "eta_min" -> "eta_minute",
+    "draught" -> "draught",
+    "destination" -> "destination",
+    "data_terminal_ready" -> "dte"
     )
 
     // Apply the above map to the data frame

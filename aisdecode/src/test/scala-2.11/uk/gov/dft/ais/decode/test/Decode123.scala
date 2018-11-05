@@ -28,8 +28,8 @@ class Decode123 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
     // Generate a map to rename and select columns (old name -> new name)
     val lookup = Map[String, String](
       "id" -> "id",
-      "decoded_repeate" -> "repeat_indicator",
-      "decoded_MMSI" -> "mmsi",
+      "repeat_indicator" -> "repeat_indicator",
+      "mmsi" -> "mmsi",
       "longitude" -> "x",
       "latitude" -> "y",
       "navigation_status" -> "nav_status",

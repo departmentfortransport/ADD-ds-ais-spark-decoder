@@ -16,7 +16,7 @@ object RawAISPacket{
   val regexTimestamp: Regex = "(?<=c:)\\d*".r
   val regexPort: Regex = "(?<=Port=)\\d*".r
   val regexS: Regex = "(?<=s:).*(?=\\/\\/P)".r
-  val regexChecksumMeta: Regex = "((?<=\\*)[\\d\\w]*)".r
+  val regexchecksum_meta: Regex = "((?<=\\*)[\\d\\w]*)".r
 
   def parseAISString(rawInputString: String): RawAISPacket = {
     // Split metadata!AIS packet
@@ -49,36 +49,36 @@ object RawAISPacket{
 
     // Generate the structure from the above
     RawAISPacket(
-      packetType = aisArray(0),
-      fragmentCount = tryIntSafe(aisArray(1)),
-      fragmentN = tryIntSafe(aisArray(2)),
-      messageID = tryIntSafe(aisArray(3)),
-      radioChannel = aisArray(4),
+      packet_type = aisArray(0),
+      fragment_count = tryIntSafe(aisArray(1)),
+      fragment_n = tryIntSafe(aisArray(2)),
+      message_id = tryIntSafe(aisArray(3)),
+      radio_channel = aisArray(4),
       data = aisArray(5),
       padding = tryIntSafe(aisPaddingChecksum(0)),
-      checksumPacket = aisPaddingChecksum(1),
+      checksum_packet = aisPaddingChecksum(1),
       s = regexS.findAllIn(meta).mkString,
       port = someStringParse(regexPort.findFirstIn(meta)),
-      mmsi = someStringParse(regexMMSI.findFirstIn(meta)),
+      port_mmsi = someStringParse(regexMMSI.findFirstIn(meta)),
       timestamp = TimestampParse(regexTimestamp.findFirstIn(meta)),
-      checksumMeta = regexChecksumMeta.findFirstIn(meta).mkString
+      checksum_meta = regexchecksum_meta.findFirstIn(meta).mkString
     )
   }
 }
 
 // Define a class for the raw data structure
 case class RawAISPacket(
-  packetType: String="",
-  fragmentCount: Option[Int]=None,
-  fragmentN: Option[Int]=None,
-  messageID: Option[Int]=None,
-  radioChannel: String="",
-  data: String="",
-  padding: Option[Int]=None,
-  checksumPacket: String="",
-  s: String="",
-  port: Option[Int]=None,
-  mmsi: Option[Int]=None,
-  timestamp: Option[Timestamp]=None,
-  checksumMeta: String=""
+                         packet_type: String="",
+                         fragment_count: Option[Int]=None,
+                         fragment_n: Option[Int]=None,
+                         message_id: Option[Int]=None,
+                         radio_channel: String="",
+                         data: String="",
+                         padding: Option[Int]=None,
+                         checksum_packet: String="",
+                         s: String="",
+                         port: Option[Int]=None,
+                         port_mmsi: Option[Int]=None,
+                         timestamp: Option[Timestamp]=None,
+                         checksum_meta: String=""
 )

@@ -186,9 +186,9 @@ object Decode123 {
 
     // For each UDF run it on the dataset.
     msg_123_raw
-      .withColumn("decoded_repeate",
+      .withColumn("repeat_indicator",
         getRepeat(msg_123_raw("dataBinary")))
-      .withColumn("decoded_MMSI",
+      .withColumn("mmsi",
         getMMSI(msg_123_raw("dataBinary")))
       .withColumn("navigation_status",
         getNavigationStatus(msg_123_raw("dataBinary")))

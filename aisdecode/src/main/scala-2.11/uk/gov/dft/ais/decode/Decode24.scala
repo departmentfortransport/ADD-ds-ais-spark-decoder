@@ -50,7 +50,7 @@ object Decode24 {
 
     // Add part a, where available to the part b
     part_b_decoded.join(part_a_subset,
-      usingColumns = Seq("decoded_mmsi", "timestamp"),
+      usingColumns = Seq("mmsi", "timestamp"),
       joinType = "left"
     )
   }
@@ -74,7 +74,7 @@ object Decode24 {
     // Each ship can only have one name per mssi and timestamp, so reduce the
     // data set to distinct
     part_a_decoded
-      .select("ship_name", "decoded_mmsi", "timestamp")
+      .select("ship_name", "mmsi", "timestamp")
       .distinct
   }
 
@@ -170,8 +170,8 @@ object Decode24 {
 
     // For each UDF run it on the dataset.
     msg_24_raw
-      .withColumn("decoded_repeate", getRepeat(msg_24_raw("dataBinary")))
-      .withColumn("decoded_mmsi", getMMSI(msg_24_raw("dataBinary")))
+      .withColumn("repeat_indicator", getRepeat(msg_24_raw("dataBinary")))
+      .withColumn("mmsi", getMMSI(msg_24_raw("dataBinary")))
       .withColumn("part_number", getPartNumber(msg_24_raw("dataBinary")))
   }
 }
