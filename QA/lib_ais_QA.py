@@ -188,6 +188,12 @@ with open(input_file, 'r') as f:
                 if data['eta_minute'] == 60:
                     data['eta_minute'] = None
 
+            elif data['id'] == 18:
+
+                #  A true heading of 511 should actually be reported as Null
+                if data['true_heading'] == 511:
+                    data['true_heading'] = None
+
             elif data['id'] == 24:
                 # Type 24 has parts A and B, so output to diff files
                 target_file = (

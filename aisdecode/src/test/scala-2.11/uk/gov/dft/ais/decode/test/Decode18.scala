@@ -32,8 +32,8 @@ class Decode18 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase{
       "decoded_mmsi" -> "mmsi",
       "speed_over_ground" -> "sog",
       "position_accuracy" -> "position_accuracy",
-      "longitude" -> "y",
-      "latitude" -> "x",
+      "latitude" -> "y",
+      "longitude" -> "x",
       "true_heading" -> "true_heading",
       "timestamp_seconds" -> "timestamp",
       "cs_unit" -> "unit_flag",
@@ -41,7 +41,6 @@ class Decode18 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase{
       "display_flag" -> "display_flag",
       "band_flag" -> "band_flag",
       "message_22_flag" -> "m22_flag",
-      "assigned" -> "commstate_flag",
       "raim" -> "raim"
     )
 
