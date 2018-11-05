@@ -24,7 +24,7 @@ class Decode5 extends FunSuite with BeforeAndAfter with DataFrameSuiteBase {
 
     // Grab the QA csv
     val (dataTarget, dataIn) = prepareQaData(spark,
-      "/Users/willbowditch/projects/ds-ais/QA/5.csv", testChecksum = false)
+      sys.env("QA_CSV_PATH") + "/5.csv", testChecksum = false)
 
     // Apply transformation used in main script
     val dataOut = transform(spark, dataIn)
