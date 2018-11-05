@@ -45,7 +45,7 @@ object Utils {
       .split("(?<=\\G.{6})")
       // convert binary to Ints
       .map(c => Integer.parseInt(c, 2))
-      // impliment conversion of strange 6bit ASCII
+      // implement conversion of strange 6bit ASCII
       .map {case i if i <= 31 => i + 64;
             case i if i>31 => i;
             case i => i}
