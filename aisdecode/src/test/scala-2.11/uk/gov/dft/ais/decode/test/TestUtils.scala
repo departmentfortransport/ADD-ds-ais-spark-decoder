@@ -28,7 +28,7 @@ object TestUtils {
       messages
     }
 
-    val ds = messages.map(l => RawAISPacket.parseAISString(l))
+    val ds = passed_checksum.map(l => RawAISPacket.parseAISString(l))
 
     // Register UDFs for extracting data binary and tagging the id
     val binary_message_udf = udf(ais_to_binary _)
@@ -57,12 +57,7 @@ object TestUtils {
   }
 
   def normaliseStringsLibAis(s: String): String = {
-    val stringsToReplace = Array("-", "_")
-
-    val regexString = stringsToReplace.mkString(sep = "|")
-
     s.replaceAll("_", "-")
-
   }
 
 }

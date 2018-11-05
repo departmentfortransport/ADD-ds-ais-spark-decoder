@@ -41,6 +41,7 @@ object Decode18 {
     out.write.parquet(args(1))
   }
 
+  //noinspection ScalaUnusedSymbol
   def transform(spark: SparkSession, binaryDecodedMessages: DataFrame): DataFrame = {
 
     // The section below defines user defined functions to extract data from
