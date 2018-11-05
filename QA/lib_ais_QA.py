@@ -91,6 +91,41 @@ def corrections(x):
     return (x)
 
 
+def null_handling(dictionary):
+    """Add null handling that is missing in libais, but implimented in scala.
+
+    Parameters
+    ----------
+    dictionary : dict
+        Dictionary returned by libais.decode
+
+    """
+    d = dictionary.copy()
+
+    null_dict = {
+        'true_heading': lambda x: None if x == 511 else x,
+        'rot': lambda x: None if np.abs(x) > 720.1 else x,
+        'timestamp': lambda x: None if x > 59 else x,
+        'sog': lambda x: None if x > 102.3 else x,
+        'x': lambda x: None if x == 181.0 else x,
+        'y': lambda x: None if x == 91.0 else x,
+        'cog': lambda x: None if x == 260 else x,
+        'eta_month': lambda x: None if x == 0 else x,
+        'eta_day': lambda x: None if x == 0 else x,
+        'eta_hour': lambda x: None if x == 24 else x,
+        'eta_minute': lambda x: None if x == 60 else x
+    }
+
+    d_with_null = {
+        k: null_dict[k](v)
+        for k, v in dictionary.items() if k in null_dict.keys()
+    }
+
+    d.update(d_with_null)
+
+    return (d)
+
+
 with open(input_file, 'r') as f:
     for line in f:
 
@@ -149,51 +184,6 @@ with open(input_file, 'r') as f:
                 # this here too
                 data['nav_status'] = m123_nav_status_lookup[data['nav_status']]
 
-                #  A true heading of 511 should actually be reported as Null
-                if data['true_heading'] == 511:
-                    data['true_heading'] = None
-
-                # LibAIS doesn't return NULL for ROT correctly, numbers higher
-                # than 720.1 must be NULL
-                if np.abs(data['rot']) > 720.1:
-                    data['rot'] = None
-
-                # Timestamp isn't handling nulls either, anything > 59 is null
-                if data["timestamp"] > 59:
-                    data['timestamp'] = None
-
-                if data["sog"] > 102.3:
-                    data["sog"] = None
-
-                if data["x"] == 181.0:
-                    data["x"] = None
-
-                if data["y"] == 91.0:
-                    data["y"] = None
-
-                if data["cog"] == 260:
-                    data["cog"] = None
-
-            elif data['id'] == 5:
-                # Add propper null handling for eta data
-                if data['eta_month'] == 0:
-                    data['eta_month'] = None
-
-                if data['eta_day'] == 0:
-                    data['eta_day'] = None
-
-                if data['eta_hour'] == 24:
-                    data['eta_hour'] = None
-
-                if data['eta_minute'] == 60:
-                    data['eta_minute'] = None
-
-            elif data['id'] == 18:
-
-                #  A true heading of 511 should actually be reported as Null
-                if data['true_heading'] == 511:
-                    data['true_heading'] = None
-
             elif data['id'] == 24:
                 # Type 24 has parts A and B, so output to diff files
                 target_file = (
@@ -202,6 +192,8 @@ with open(input_file, 'r') as f:
             # Convert any Bools to integers (as that's how they're handled in
             # Scala)
             data = {k: corrections(v) for k, v in data.items()}
+
+            data = null_handling(data)
 
             # Append the raw data
             data['rawInput'] = line.rstrip("\n")
