@@ -12,7 +12,7 @@ object Decode123 {
   /**
    * Decode type 5 messages
    * params 0 - read bucket location
-   * parms 1 - write bucket location (parquet file)
+   * params 1 - write bucket location (parquet file)
    */
   def main (args:Array[String]): Unit = {
 
@@ -57,7 +57,7 @@ object Decode123 {
         case Some(0) => Some("Under way using engine")
         case Some(1) => Some("At anchor")
         case Some(2) => Some("Not under command")
-        case Some(3) => Some("Restricted manoeuverability")
+        case Some(3) => Some("Restricted maneuverability")
         case Some(4) => Some("Constrained by her draught")
         case Some(5) => Some("Moored")
         case Some(6) => Some("Aground")

@@ -1,13 +1,14 @@
 """Slow python based decoder to output QA dataset."""
 import csv
 import re
+import os
 
 import ais
 import numpy as np
 
 # Config
 types = [1, 2, 3, 5, 18, 24]
-input_file = "../data/ais-mini-test/ais_mini_10000.dat"
+input_file = os.environ["QA_DAT_PATH"]
 
 # Setup regex to check for exceptions we care about, they all follow the format
 # AisN:

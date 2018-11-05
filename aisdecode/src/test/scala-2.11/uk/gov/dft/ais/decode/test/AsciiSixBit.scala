@@ -3,7 +3,7 @@ package uk.gov.dft.ais.decode.test
 import org.scalatest.FunSuite
 import uk.gov.dft.ais.decode.Utils.ais_6bit_asci
 
-class AsciSixBit extends FunSuite {
+class AsciiSixBit extends FunSuite {
   val alphabet = List(
     List("000000",0,"@"),
     List("010000",16,"P"),
@@ -71,7 +71,7 @@ class AsciSixBit extends FunSuite {
     List("111111",63,"?")
   )
 
-  test("Test 6 bit asci conversion matches table"){
+  test("Test 6 bit ascii conversion matches table"){
     alphabet.foreach{
       case List(binaryString: String, _: Int, targetString: String) =>
         assert(ais_6bit_asci(binaryString) === targetString)

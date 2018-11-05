@@ -22,7 +22,7 @@ object Utils {
    */
   def ais_to_binary(encodedMessage:String): String = {
     encodedMessage
-      // This step impliments the above
+      // This step implements the above
       .map(ch => ch.toInt)
       .map(e => e - 48)
       .map {case e if e > 40 => e - 8; case e => e}
@@ -49,7 +49,7 @@ object Utils {
       .map {case i if i <= 31 => i + 64;
             case i if i>31 => i;
             case i => i}
-      // now we have regular ASCII integers conver to char
+      // now we have regular ASCII integers convert to char
       .map {i => i.toChar}.mkString
   }
 
@@ -125,7 +125,7 @@ object Utils {
 
     /**
      * Convert a string encoded integer to a Java timestamp
-     * Note - Multipying by 1,000 as Java timestamps are milisecond.
+     * Note - Multipying by 1,000 as Java timestamps are millisecond.
      */
     def TimestampParse(s: Option[String]): Option[Timestamp] = {
       Try(new Timestamp(Integer.parseInt(s.get.trim).toLong * 1000)).toOption
