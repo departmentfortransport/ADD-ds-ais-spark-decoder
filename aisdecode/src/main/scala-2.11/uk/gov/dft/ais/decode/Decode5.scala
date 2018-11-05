@@ -3,6 +3,7 @@ package uk.gov.dft.ais.decode
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.udf
 import Utils.{extractInt, extractString, parseIntWScale}
+import RawClean.removeUnused
 
 object Decode5 {
   /**
@@ -32,7 +33,8 @@ object Decode5 {
       .load(args(0))
 
     // Apply the transformation
-    val out = transform(spark, binary_decoded_messages)
+    val transformed = transform(spark, binary_decoded_messages)
+    val out = removeUnused(spark, transformed)
 
     // write out to parquet files, location specified in the second argument
     out.write.parquet(args(1))
