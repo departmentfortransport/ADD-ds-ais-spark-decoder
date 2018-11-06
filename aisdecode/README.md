@@ -41,7 +41,7 @@ cd /aisdecode # Project root, same location as build.sbt
 
 sbt package 
 
-# Put the compiled car in a bucket the dataproc cluster has access to
+# Put the compiled jar in a bucket the dataproc cluster has access to
 gsutil cp \
 	target/scala-2.11/aisdecode_*.jar \
 	gs://dft-dst-prt-ais-resources/

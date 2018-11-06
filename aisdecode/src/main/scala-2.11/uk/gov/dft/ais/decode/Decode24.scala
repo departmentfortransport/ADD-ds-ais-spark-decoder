@@ -71,7 +71,7 @@ object Decode24 {
     val part_a_decoded = part_a
       .withColumn("ship_name", getShipName(part_a("dataBinary")))
 
-    // Each ship can only have one name per mssi and timestamp, so reduce the
+    // Each ship can only have one name per mmsi and timestamp, so reduce the
     // data set to distinct
     part_a_decoded
       .select("ship_name", "mmsi", "timestamp")
@@ -113,12 +113,6 @@ object Decode24 {
 
     // Bits 162-167 are not used ('spare')
 
-//    val part_b = dataWithPartNumber
-//      .where($"part_number"===1 ||
-//        // Following libais some devices report part A as part B,
-//        // but the bit length gives it away
-//        $"part_number"===0 && stringLength($"dataBinary") === 162)
-
     val part_b = dataWithPartNumber
       .where($"part_number"===1 ||
         // Following libais some devices report part A as part B,
@@ -156,11 +150,11 @@ object Decode24 {
     //    From this point on the message might be type A or B. They are
     //    broadcast together, but may not be together in our DB. So we need
     //    to decode, match them up, then output them together. Because of this
-    //    this is proably going to involve some shuffling.
+    //    this is probably going to involve some shuffling.
 
     val msg_24_raw = binaryDecodedMessages
       // Filter just messages 24
-      // this should be fast as data is partitioned my id
+      // this should be fast as data is partitioned by id
       .where($"id" === 24)
       // Only keep valid string lengths
       .where(

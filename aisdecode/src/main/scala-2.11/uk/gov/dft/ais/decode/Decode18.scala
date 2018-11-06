@@ -7,7 +7,7 @@ import RawClean.removeUnused
 
 object Decode18 {
   /**
-   * Decode type 5 messages
+   * Decode type 18 messages
    * params 0 - read bucket location
    * params 1 - write bucket location (parquet file)
    */
@@ -87,14 +87,14 @@ object Decode18 {
       // indicates latitude is not available and is the default.
       parseIntWScale(x.slice(85,112)) match {
         case Some(i) =>
-          val long = i / 600000.0
-          if (long == 91){None}else{Some(long)}
+          val lat = i / 600000.0
+          if (lat == 91){None}else{Some(lat)}
         case None => None
       }
     }
 
 
-    val getHDG = udf [Option[Int] , String] {x=>
+    val getHeading = udf [Option[Int] , String] { x=>
       // 0 to 359 degrees, 511 = not available.
       extractInt(x,124,133) match {
         case Some(i) => if(i==511){None}else{Some(i)}
@@ -139,7 +139,7 @@ object Decode18 {
     val getRAIM = udf [Option[Int] , String] (x=> extractInt(x,147,148))
 
     // This one contains diagnostic info for radio systems, so not processing.
-    val getRadioStatus = udf [Option[Int] , String] (x=> extractInt(x,149,168))
+    // val getRadioStatus = udf [Option[Int] , String] (x=> extractInt(x,149,168))
 
     import spark.implicits._
 
@@ -166,7 +166,7 @@ object Decode18 {
       .withColumn("latitude",
         getLatitude(msg_18_raw("dataBinary")))
       .withColumn("true_heading",
-        getHDG(msg_18_raw("dataBinary")))
+        getHeading(msg_18_raw("dataBinary")))
       .withColumn("timestamp_seconds",
         getTimestamp(msg_18_raw("dataBinary")))
       .withColumn("cs_unit",
