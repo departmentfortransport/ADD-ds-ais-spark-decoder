@@ -55,7 +55,7 @@ object RawDecode {
     // on messages between 1-3 sentences.
     val window = Window
       .partitionBy($"port_mmsi", $"timestamp", $"fragment_count")
-      .orderBy("fragment_count")
+      .orderBy("fragment_n")
 
     val multi_part_messages_with_index = ds
       .withColumn("GeneratedID", $"fragment_n" - row_number.over(window))

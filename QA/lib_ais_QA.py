@@ -35,7 +35,7 @@ m123_nav_status_lookup = {
     1: "At anchor",
     0: "Under way using engine",
     2: "Not under command",
-    3: "Restricted manoeuverability",
+    3: "Restricted maneuverability",
     4: "Constrained by her draught",
     5: "Moored",
     6: "Aground",
