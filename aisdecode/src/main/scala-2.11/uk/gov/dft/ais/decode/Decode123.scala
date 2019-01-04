@@ -27,8 +27,6 @@ object Decode123 {
       .config("spark.sql.shuffle.partitions", "36500")
       .getOrCreate()
 
-    // this import has to go after val spark.
-
     // Read in the parquet files from first argument location
     val binary_decoded_messages = spark
       .read.format("parquet")
