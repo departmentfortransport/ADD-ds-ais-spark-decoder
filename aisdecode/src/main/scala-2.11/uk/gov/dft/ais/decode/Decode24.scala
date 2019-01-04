@@ -61,6 +61,7 @@ object Decode24 {
     // Separate out the message by parts.
     // Part A only contains ship name, so these can be merged onto the info in
     // Part B later
+    // A and B are encoded as 0 and 1 in AIS
     val part_a = dataWithPartNumber.where($"part_number"===0)
 
     // Part A - Message can be 168 bits, but the last 8 are not used.
