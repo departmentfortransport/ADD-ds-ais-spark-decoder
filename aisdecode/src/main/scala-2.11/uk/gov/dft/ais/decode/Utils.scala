@@ -1,13 +1,14 @@
 package uk.gov.dft.ais.decode
 
-import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.types.{StructField, StructType, _}
-import org.apache.spark.sql.{Row, SaveMode, SparkSession}
-import scala.util.Try
-import scala.math.pow
 import java.sql.Timestamp
 
-object utils {
+import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions.udf
+
+import scala.math.pow
+import scala.util.Try
+
+object Utils {
   /**
    * The data payload is an ASCII-encoded bit vector.
    * Each character represents six bits of data.
@@ -21,7 +22,7 @@ object utils {
    */
   def ais_to_binary(encodedMessage:String): String = {
     encodedMessage
-      // This step impliments the above
+      // This step implements the above
       .map(ch => ch.toInt)
       .map(e => e - 48)
       .map {case e if e > 40 => e - 8; case e => e}
@@ -43,26 +44,27 @@ object utils {
       // split the string into 6 bit chunks
       .split("(?<=\\G.{6})")
       // convert binary to Ints
-      .map(c => (Integer.parseInt(c, 2)))
-      // impliment conversion of strange 6bit ASCII
+      .map(c => Integer.parseInt(c, 2))
+      // implement conversion of strange 6bit ASCII
       .map {case i if i <= 31 => i + 64;
             case i if i>31 => i;
             case i => i}
-      // now we have regular ASCII integers conver to char
+      // now we have regular ASCII integers convert to char
       .map {i => i.toChar}.mkString
   }
 
+
   /**
-   * Calculate the XOR checksum for AIS arrays.
-   * [stringChecksumPair An array of the form [String, Checksum]]
-   * Returns boolean True (checksum match) or False
-   */
+    * Calculate the XOR checksum for AIS arrays.
+    * @param stringChecksumPair An array of the form [String, Checksum]
+    * @return boolean True (checksum match) or False
+    */
    def validate_ais_checksum(stringChecksumPair: Array[String]): Boolean =
      stringChecksumPair match {
-       case Array(string, checksum_match) => {
+       case Array(string, checksum_match) =>
          var checksum = 0
          // Map over the string performing XOR checksum calculation
-         string.map{ char => checksum = checksum ^ char.toInt }
+         string.foreach{  char => checksum = checksum ^ char.toInt }
          if( f"$checksum%02X".toUpperCase == checksum_match.toUpperCase){
            true //Checksum matches!
          } else {
@@ -72,8 +74,7 @@ object utils {
              For string: $string""")
            false //Checksum doesn't match
          }
-       }
-       case _ => {println("Error! Not an array!"); false}
+       case _ => println("Error! Not an array!"); false
      }
 
 
@@ -124,7 +125,7 @@ object utils {
 
     /**
      * Convert a string encoded integer to a Java timestamp
-     * Note - Multipying by 1,000 as Java timestamps are milisecond.
+     * Note - Multipying by 1,000 as Java timestamps are millisecond.
      */
     def TimestampParse(s: Option[String]): Option[Timestamp] = {
       Try(new Timestamp(Integer.parseInt(s.get.trim).toLong * 1000)).toOption
@@ -141,17 +142,24 @@ object utils {
      * Convenience function to safely slice a string and convert from 6bit asci
      */
     def extractString(input: String, start: Int, end: Int): Option [String] = {
-      val safe_start = if(input.length < start){input.length}else{start}
-      val safe_end = if(input.length < end){input.length}else{end}
+      val safe_start = if(input.length < start){input.length} else start
+      val safe_end = if(input.length < end){input.length} else end
       Try(ais_6bit_asci(input.slice(safe_start, safe_end))).toOption
     }
 
     /**
      * Quick string length udf
      */
-    val stringLength = udf [Int, String] {
+    val stringLength: UserDefinedFunction = udf [Int, String] {
       x => x.length()
       }
 
+
+    /**
+      * Extract message type from binary string
+      */
+    def returnMessageType(as_binary: String): Option[Int] = {
+      Try(Integer.parseInt(as_binary.slice(0,6), 2)).toOption
+    }
 
 }
