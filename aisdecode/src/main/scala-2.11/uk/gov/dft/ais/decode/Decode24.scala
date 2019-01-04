@@ -19,7 +19,7 @@ object Decode24 {
       .appName("AIS-decode-24")
       .master("yarn")
       .config("spark.executor.cores", "2")
-      .config("spark.executor.memory", "1g")
+      .config("spark.executor.memory", "4g")
       .config("spark.default.parallelism", "36500")
       .config("spark.sql.shuffle.partitions", "36500")
       .getOrCreate()
