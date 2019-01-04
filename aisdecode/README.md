@@ -41,9 +41,9 @@ cd /aisdecode # Project root, same location as build.sbt
 
 sbt package 
 
-# Put the compiled car in a bucket the dataproc cluster has access to
+# Put the compiled jar in a bucket the dataproc cluster has access to
 gsutil cp \
-	target/scala-2.11/aisdecode_*.jar \
+	target/scala-2.11/ais-decode_*.jar \
 	gs://dft-dst-prt-ais-resources/
 ```
 
@@ -71,9 +71,9 @@ gcloud beta dataproc jobs submit spark \
   --cluster ais-dataproc \
   --project dft-dst-prt-ais \
   --region=europe-west1 \
-  --jars gs://dft-dst-prt-ais-resources/aisdecode_2.11-0.1.0-SNAPSHOT.jar \
-  --class uk.gov.dft.ais.decode.decode5 \
-  -- 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded' 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_mtype_5'
+  --jars gs://dft-dst-prt-ais-resources/ais-decode_2.11-0.1.0.jar \
+  --class uk.gov.dft.ais.decode.RawDecode \
+  -- 'gs://dft-dst-prt-ais-raw-2016/*.dat' 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_raw/'
 ```
 
 Where the `--jars` is the compiled script stored in a bucket and `--class` is the object we want to call, where the main function will be called. 
@@ -111,4 +111,45 @@ The UI's will then be available from that browser at:
 ```sh
 gcloud dataproc clusters delete ais-dataproc --quiet
 ```
+
+
+
+## Walkthrough of jobs
+
+At present, to generate the files needed for the port clusters the following jobs need to be run. This will probably be formalised as an Airflow DAG in future. 
+
+```sh
+# 1 - Generate intermediate files
+# Note: at this step google cloud storage files with spaces cause an error
+# rename with underscore if so
+gcloud beta dataproc jobs submit spark \
+  --cluster ais-dataproc \
+  --project dft-dst-prt-ais \
+  --region=europe-west1 \
+  --jars gs://dft-dst-prt-ais-resources/ais-decode_2.11-0.1.0.jar \
+  --class uk.gov.dft.ais.decode.RawDecode \
+  -- 'gs://dft-dst-prt-ais-raw-2016/*.dat' 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_raw/'
+  
+# 2 - Then decode the message types you need, here I'll do 123 and 5
+# note, we are using the files generated at step 1
+gcloud beta dataproc jobs submit spark \
+  --cluster ais-dataproc \
+  --project dft-dst-prt-ais \
+  --region=europe-west1 \
+  --jars gs://dft-dst-prt-ais-resources/ais-decode_2.11-0.1.0.jar \
+  --class uk.gov.dft.ais.decode.Decode123 \
+  -- 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_raw/' 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_123/'
+  
+gcloud beta dataproc jobs submit spark \
+  --cluster ais-dataproc \
+  --project dft-dst-prt-ais \
+  --region=europe-west1 \
+  --jars gs://dft-dst-prt-ais-resources/ais-decode_2.11-0.1.0.jar \
+  --class uk.gov.dft.ais.decode.Decode5 \
+  -- 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_raw/' 'gs://dft-dst-prt-ais-decoded-2016/2016_Decoded_5/'
+  
+# 3+ - We can then keep doing this for each message type we want to decode.
+```
+
+
 

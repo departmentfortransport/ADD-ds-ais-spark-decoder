@@ -1,0 +1,2594 @@
+<html>
+      <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title id="title">
+          uk/gov/dft/ais/decode/Decode24.scala.html
+        </title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/css/theme.default.min.css" type="text/css"/><script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.20.1/js/jquery.tablesorter.min.js"></script><link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" type="text/css"/><script src="https://netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script><script type="text/javascript">
+        $(document).ready(function() {$(".tablesorter").tablesorter();});
+      </script>
+        <style>
+          table.codegrid { font-family: monospace; font-size: 12px; width: auto!important; }table.statementlist { width: auto!important; font-size: 13px; } table.codegrid td { padding: 0!important; border: 0!important } table td.linenumber { width: 40px!important; } 
+        </style>
+      </head>
+      <body style="font-family: monospace;">
+        <ul class="nav nav-tabs">
+          <li>
+            <a href="#codegrid" data-toggle="tab">Codegrid</a>
+          </li>
+          <li>
+            <a href="#statementlist" data-toggle="tab">Statement List</a>
+          </li>
+        </ul>
+        <div class="tab-content">
+          <div class="tab-pane active" id="codegrid">
+            <pre style='font-size: 12pt; font-family: courier;'>1 <span style=''>package uk.gov.dft.ais.decode
+</span>2 <span style=''>
+</span>3 <span style=''>import org.apache.spark.sql.{DataFrame, SparkSession}
+</span>4 <span style=''>import org.apache.spark.sql.functions.udf
+</span>5 <span style=''>import Utils.{extractInt, extractString, parseIntWScale, stringLength}
+</span>6 <span style=''>import RawClean.removeUnused
+</span>7 <span style=''>
+</span>8 <span style=''>object Decode24 {
+</span>9 <span style=''>  /**
+</span>10 <span style=''>   * Decode type 24 messages
+</span>11 <span style=''>   * params 0 - read bucket location
+</span>12 <span style=''>   * params 1 - write bucket location (parquet file)
+</span>13 <span style=''>   */
+</span>14 <span style=''>  def main (args:Array[String]): Unit = {
+</span>15 <span style=''>
+</span>16 <span style=''>    // Start a spark context
+</span>17 <span style=''>    val spark = </span><span style='background: #F0ADAD'>SparkSession
+</span>18 <span style=''></span><span style='background: #F0ADAD'>      .builder()
+</span>19 <span style=''></span><span style='background: #F0ADAD'>      .appName(&quot;AIS-decode-24&quot;)
+</span>20 <span style=''></span><span style='background: #F0ADAD'>      .master(&quot;yarn&quot;)
+</span>21 <span style=''></span><span style='background: #F0ADAD'>      .config(&quot;spark.executor.cores&quot;, &quot;2&quot;)
+</span>22 <span style=''></span><span style='background: #F0ADAD'>      .config(&quot;spark.executor.memory&quot;, &quot;1g&quot;)
+</span>23 <span style=''></span><span style='background: #F0ADAD'>      .config(&quot;spark.default.parallelism&quot;, &quot;36500&quot;)
+</span>24 <span style=''></span><span style='background: #F0ADAD'>      .config(&quot;spark.sql.shuffle.partitions&quot;, &quot;36500&quot;)
+</span>25 <span style=''></span><span style='background: #F0ADAD'>      .getOrCreate()</span><span style=''>
+</span>26 <span style=''>
+</span>27 <span style=''>    // this import has to go after val spark.
+</span>28 <span style=''>    import spark.implicits._
+</span>29 <span style=''>
+</span>30 <span style=''>    // Read in the parquet files from first argument location
+</span>31 <span style=''>    val binary_decoded_messages = </span><span style='background: #F0ADAD'>spark
+</span>32 <span style=''></span><span style='background: #F0ADAD'>      .read.format(&quot;parquet&quot;)
+</span>33 <span style=''></span><span style='background: #F0ADAD'>      .load(args(0))</span><span style=''>
+</span>34 <span style=''>
+</span>35 <span style=''>    val joined_up = </span><span style='background: #F0ADAD'>transform(spark, binary_decoded_messages)</span><span style=''>
+</span>36 <span style=''>    val out = </span><span style='background: #F0ADAD'>removeUnused(spark, joined_up)</span><span style=''>
+</span>37 <span style=''>
+</span>38 <span style=''>    // write out to parquet files, location specified in the second argument
+</span>39 <span style=''>    </span><span style='background: #F0ADAD'>out.write.parquet(args(1))</span><span style=''>
+</span>40 <span style=''>
+</span>41 <span style=''>  }
+</span>42 <span style=''>
+</span>43 <span style=''>  def transform(spark: SparkSession, binaryDecodedMessages: DataFrame): DataFrame = {
+</span>44 <span style=''>
+</span>45 <span style=''>    import spark.implicits._
+</span>46 <span style=''>
+</span>47 <span style=''>    val add_part_number = </span><span style='background: #AEF1AE'>transformPartNumber(spark, binaryDecodedMessages)</span><span style=''>
+</span>48 <span style=''>    val part_a_subset = </span><span style='background: #AEF1AE'>transformPartA(spark, add_part_number)</span><span style=''>
+</span>49 <span style=''>    val part_b_decoded = </span><span style='background: #AEF1AE'>transformPartB(spark, add_part_number)</span><span style=''>
+</span>50 <span style=''>
+</span>51 <span style=''>    // Add part a, where available to the part b
+</span>52 <span style=''>    </span><span style='background: #AEF1AE'>part_b_decoded.join(part_a_subset,
+</span>53 <span style=''></span><span style='background: #AEF1AE'>      usingColumns = Seq(&quot;mmsi&quot;, &quot;timestamp&quot;),
+</span>54 <span style=''></span><span style='background: #AEF1AE'>      joinType = &quot;left&quot;
+</span>55 <span style=''></span><span style='background: #AEF1AE'>    )</span><span style=''>
+</span>56 <span style=''>  }
+</span>57 <span style=''>
+</span>58 <span style=''>  def transformPartA(spark: SparkSession, dataWithPartNumber: DataFrame): DataFrame = {
+</span>59 <span style=''>    import spark.implicits._
+</span>60 <span style=''>
+</span>61 <span style=''>    // Separate out the message by parts.
+</span>62 <span style=''>    // Part A only contains ship name, so these can be merged onto the info in
+</span>63 <span style=''>    // Part B later
+</span>64 <span style=''>    val part_a = </span><span style='background: #AEF1AE'>dataWithPartNumber.where($&quot;part_number&quot;===0)</span><span style=''>
+</span>65 <span style=''>
+</span>66 <span style=''>    // Part A - Message can be 168 bits, but the last 8 are not used.
+</span>67 <span style=''>    val getShipName = </span><span style='background: #AEF1AE'>udf [Option[String] , String] { x=&gt;
+</span>68 <span style=''></span><span style='background: #AEF1AE'>      extractString(x, 40, 160)
+</span>69 <span style=''></span><span style='background: #AEF1AE'>    }</span><span style=''>
+</span>70 <span style=''>
+</span>71 <span style=''>    val part_a_decoded = </span><span style='background: #AEF1AE'>part_a
+</span>72 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;ship_name&quot;, getShipName(part_a(&quot;dataBinary&quot;)))</span><span style=''>
+</span>73 <span style=''>
+</span>74 <span style=''>    // Each ship can only have one name per mmsi and timestamp, so reduce the
+</span>75 <span style=''>    // data set to distinct
+</span>76 <span style=''>    </span><span style='background: #AEF1AE'>part_a_decoded
+</span>77 <span style=''></span><span style='background: #AEF1AE'>      .select(&quot;ship_name&quot;, &quot;mmsi&quot;, &quot;timestamp&quot;)
+</span>78 <span style=''></span><span style='background: #AEF1AE'>      .distinct</span><span style=''>
+</span>79 <span style=''>  }
+</span>80 <span style=''>
+</span>81 <span style=''>  def transformPartB(spark: SparkSession, dataWithPartNumber: DataFrame): DataFrame = {
+</span>82 <span style=''>    import spark.implicits._
+</span>83 <span style=''>
+</span>84 <span style=''>    // Part B
+</span>85 <span style=''>    val getShipType = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] ( x=&gt; extractInt(x,40,48))</span><span style=''>
+</span>86 <span style=''>
+</span>87 <span style=''>    //  Bits 48-89 are as described in ITU-R 1371-4. In earlier versions to 1371-3 this was one sixbit-encoded 42-bit
+</span>88 <span style=''>    // (7-character) string field, the name of the AIS equipment vendor. The last 4 characters of the string are
+</span>89 <span style=''>    // reinterpreted as a model/serial numeric pair. It is not clear that field practice has caught up with this
+</span>90 <span style=''>    // incompatible change. Implementations would be wise to decode that but span in both ways and trust human eyes
+</span>91 <span style=''>    // to detect when the final 4 characters of the string or the model and serial fields are garbage.
+</span>92 <span style=''>    val getVendorID = </span><span style='background: #AEF1AE'>udf [Option[String] , String] { x=&gt;
+</span>93 <span style=''></span><span style='background: #AEF1AE'>      // Vendor ID is 3 6bit characters
+</span>94 <span style=''></span><span style='background: #AEF1AE'>      extractString(x, 48, 90)
+</span>95 <span style=''></span><span style='background: #AEF1AE'>    }</span><span style=''>
+</span>96 <span style=''>
+</span>97 <span style=''>
+</span>98 <span style=''>    val getCallSign = </span><span style='background: #AEF1AE'>udf [Option[String] , String] { x=&gt;
+</span>99 <span style=''></span><span style='background: #AEF1AE'>      extractString(x, 90,132)
+</span>100 <span style=''></span><span style='background: #AEF1AE'>    }</span><span style=''>
+</span>101 <span style=''>
+</span>102 <span style=''>    val getToBow = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] ( x=&gt; extractInt(x,132,141))</span><span style=''>
+</span>103 <span style=''>
+</span>104 <span style=''>    val getToStern = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] ( x=&gt; extractInt(x,141,150))</span><span style=''>
+</span>105 <span style=''>
+</span>106 <span style=''>    val getToPort = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] ( x=&gt; extractInt(x,150,156))</span><span style=''>
+</span>107 <span style=''>
+</span>108 <span style=''>    val getToStarboard = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] ( x=&gt; extractInt(x,156,162))</span><span style=''>
+</span>109 <span style=''>
+</span>110 <span style=''>    val getMothershipMMSI = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] {
+</span>111 <span style=''></span><span style='background: #AEF1AE'>      x=&gt; </span><span style='background: #F0ADAD'>extractInt(x,132,162)</span><span style='background: #AEF1AE'>
+</span>112 <span style=''></span><span style='background: #AEF1AE'>    }</span><span style=''>
+</span>113 <span style=''>
+</span>114 <span style=''>    // Bits 162-167 are not used ('spare')
+</span>115 <span style=''>
+</span>116 <span style=''>    val part_b = </span><span style='background: #AEF1AE'>dataWithPartNumber
+</span>117 <span style=''></span><span style='background: #AEF1AE'>      .where($&quot;part_number&quot;===1 ||
+</span>118 <span style=''></span><span style='background: #AEF1AE'>        // Following libais some devices report part A as part B,
+</span>119 <span style=''></span><span style='background: #AEF1AE'>        // but the bit length gives it away
+</span>120 <span style=''></span><span style='background: #AEF1AE'>        $&quot;part_number&quot;===0 &amp;&amp; stringLength($&quot;dataBinary&quot;) === 162)</span><span style=''>
+</span>121 <span style=''>
+</span>122 <span style=''>
+</span>123 <span style=''>    // Process the part b messages
+</span>124 <span style=''>    </span><span style='background: #AEF1AE'>part_b
+</span>125 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;ship_type&quot;, getShipType(part_b(&quot;dataBinary&quot;)))
+</span>126 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;vendor_id&quot;, getVendorID(part_b(&quot;dataBinary&quot;)))
+</span>127 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;call_sign&quot;, getCallSign(part_b(&quot;dataBinary&quot;)))
+</span>128 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;to_bow&quot;, getToBow(part_b(&quot;dataBinary&quot;)))
+</span>129 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;to_stern&quot;, getToStern(part_b(&quot;dataBinary&quot;)))
+</span>130 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;to_port&quot;, getToPort(part_b(&quot;dataBinary&quot;)))
+</span>131 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;to_starboard&quot;, getToStarboard(part_b(&quot;dataBinary&quot;)))
+</span>132 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;mothership_mmsi&quot;, getMothershipMMSI(part_b(&quot;dataBinary&quot;)))</span><span style=''>
+</span>133 <span style=''>  }
+</span>134 <span style=''>
+</span>135 <span style=''>  def transformPartNumber(spark: SparkSession, binaryDecodedMessages: DataFrame): DataFrame ={
+</span>136 <span style=''>    import spark.implicits._
+</span>137 <span style=''>    // The section below defines user defined functions to extract data from
+</span>138 <span style=''>    // the binary string generated by rawdecode
+</span>139 <span style=''>    val getRepeat = </span><span style='background: #AEF1AE'>udf [Option[Int], String] (x =&gt; extractInt(x,6,8))</span><span style=''>
+</span>140 <span style=''>
+</span>141 <span style=''>    val getMMSI = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] (x=&gt; extractInt(x,8,38))</span><span style=''>
+</span>142 <span style=''>
+</span>143 <span style=''>    val getPartNumber = </span><span style='background: #AEF1AE'>udf [Option[Int] , String] {
+</span>144 <span style=''></span><span style='background: #AEF1AE'>      // If 0, the rest of the message is Part A
+</span>145 <span style=''></span><span style='background: #AEF1AE'>      // if 1, the rest of the message is Part B
+</span>146 <span style=''></span><span style='background: #AEF1AE'>      x=&gt; extractInt(x,38,40)
+</span>147 <span style=''></span><span style='background: #AEF1AE'>    }</span><span style=''>
+</span>148 <span style=''>
+</span>149 <span style=''>    // Notes:
+</span>150 <span style=''>    //    From this point on the message might be type A or B. They are
+</span>151 <span style=''>    //    broadcast together, but may not be together in our DB. So we need
+</span>152 <span style=''>    //    to decode, match them up, then output them together. Because of this
+</span>153 <span style=''>    //    this is probably going to involve some shuffling.
+</span>154 <span style=''>
+</span>155 <span style=''>    val msg_24_raw = </span><span style='background: #AEF1AE'>binaryDecodedMessages
+</span>156 <span style=''></span><span style='background: #AEF1AE'>      // Filter just messages 24
+</span>157 <span style=''></span><span style='background: #AEF1AE'>      // this should be fast as data is partitioned by id
+</span>158 <span style=''></span><span style='background: #AEF1AE'>      .where($&quot;id&quot; === 24)
+</span>159 <span style=''></span><span style='background: #AEF1AE'>      // Only keep valid string lengths
+</span>160 <span style=''></span><span style='background: #AEF1AE'>      .where(
+</span>161 <span style=''></span><span style='background: #AEF1AE'>      stringLength($&quot;dataBinary&quot;) === 168 ||
+</span>162 <span style=''></span><span style='background: #AEF1AE'>        stringLength($&quot;dataBinary&quot;) === 162
+</span>163 <span style=''></span><span style='background: #AEF1AE'>    )</span><span style=''>
+</span>164 <span style=''>
+</span>165 <span style=''>    // For each UDF run it on the dataset.
+</span>166 <span style=''>    </span><span style='background: #AEF1AE'>msg_24_raw
+</span>167 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;repeat_indicator&quot;, getRepeat(msg_24_raw(&quot;dataBinary&quot;)))
+</span>168 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;mmsi&quot;, getMMSI(msg_24_raw(&quot;dataBinary&quot;)))
+</span>169 <span style=''></span><span style='background: #AEF1AE'>      .withColumn(&quot;part_number&quot;, getPartNumber(msg_24_raw(&quot;dataBinary&quot;)))</span><span style=''>
+</span>170 <span style=''>  }
+</span>171 <span style=''>}
+</span></pre>
+          </div>
+          <div class="tab-pane" id="statementlist">
+            <table cellspacing="0" cellpadding="0" class="table statementlist">
+      <tr>
+        <th>Line</th>
+        <th>Stmt Id</th>
+        <th>Pos</th>
+        <th>Tree</th>
+        <th>Symbol</th>
+        <th>Code</th>
+      </tr><tr>
+        <td>
+          25
+        </td>
+        <td>
+          281
+        </td>
+        <td>
+          465
+          -
+          764
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.SparkSession.Builder.getOrCreate
+        </td>
+        <td style="background: #F0ADAD">
+          org.apache.spark.sql.SparkSession.builder().appName(&quot;AIS-decode-24&quot;).master(&quot;yarn&quot;).config(&quot;spark.executor.cores&quot;, &quot;2&quot;).config(&quot;spark.executor.memory&quot;, &quot;1g&quot;).config(&quot;spark.default.parallelism&quot;, &quot;36500&quot;).config(&quot;spark.sql.shuffle.partitions&quot;, &quot;36500&quot;).getOrCreate()
+        </td>
+      </tr><tr>
+        <td>
+          32
+        </td>
+        <td>
+          282
+        </td>
+        <td>
+          963
+          -
+          972
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #F0ADAD">
+          &quot;parquet&quot;
+        </td>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          283
+        </td>
+        <td>
+          986
+          -
+          993
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          scala.Array.apply
+        </td>
+        <td style="background: #F0ADAD">
+          args.apply(0)
+        </td>
+      </tr><tr>
+        <td>
+          33
+        </td>
+        <td>
+          284
+        </td>
+        <td>
+          938
+          -
+          994
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.DataFrameReader.load
+        </td>
+        <td style="background: #F0ADAD">
+          spark.read.format(&quot;parquet&quot;).load(args.apply(0))
+        </td>
+      </tr><tr>
+        <td>
+          35
+        </td>
+        <td>
+          285
+        </td>
+        <td>
+          1016
+          -
+          1057
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Decode24.transform
+        </td>
+        <td style="background: #F0ADAD">
+          Decode24.this.transform(spark, binary_decoded_messages)
+        </td>
+      </tr><tr>
+        <td>
+          36
+        </td>
+        <td>
+          286
+        </td>
+        <td>
+          1072
+          -
+          1102
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.RawClean.removeUnused
+        </td>
+        <td style="background: #F0ADAD">
+          RawClean.removeUnused(spark, joined_up)
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          288
+        </td>
+        <td>
+          1185
+          -
+          1211
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.DataFrameWriter.parquet
+        </td>
+        <td style="background: #F0ADAD">
+          out.write.parquet(args.apply(1))
+        </td>
+      </tr><tr>
+        <td>
+          39
+        </td>
+        <td>
+          287
+        </td>
+        <td>
+          1203
+          -
+          1210
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          scala.Array.apply
+        </td>
+        <td style="background: #F0ADAD">
+          args.apply(1)
+        </td>
+      </tr><tr>
+        <td>
+          47
+        </td>
+        <td>
+          289
+        </td>
+        <td>
+          1361
+          -
+          1410
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Decode24.transformPartNumber
+        </td>
+        <td style="background: #AEF1AE">
+          Decode24.this.transformPartNumber(spark, binaryDecodedMessages)
+        </td>
+      </tr><tr>
+        <td>
+          48
+        </td>
+        <td>
+          290
+        </td>
+        <td>
+          1435
+          -
+          1473
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Decode24.transformPartA
+        </td>
+        <td style="background: #AEF1AE">
+          Decode24.this.transformPartA(spark, add_part_number)
+        </td>
+      </tr><tr>
+        <td>
+          49
+        </td>
+        <td>
+          291
+        </td>
+        <td>
+          1499
+          -
+          1537
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Decode24.transformPartB
+        </td>
+        <td style="background: #AEF1AE">
+          Decode24.this.transformPartB(spark, add_part_number)
+        </td>
+      </tr><tr>
+        <td>
+          52
+        </td>
+        <td>
+          294
+        </td>
+        <td>
+          1592
+          -
+          1703
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.join
+        </td>
+        <td style="background: #AEF1AE">
+          part_b_decoded.join(part_a_subset, collection.this.Seq.apply[String](&quot;mmsi&quot;, &quot;timestamp&quot;), &quot;left&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          53
+        </td>
+        <td>
+          292
+        </td>
+        <td>
+          1648
+          -
+          1672
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          scala.collection.generic.GenericCompanion.apply
+        </td>
+        <td style="background: #AEF1AE">
+          collection.this.Seq.apply[String](&quot;mmsi&quot;, &quot;timestamp&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          54
+        </td>
+        <td>
+          293
+        </td>
+        <td>
+          1691
+          -
+          1697
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;left&quot;
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          295
+        </td>
+        <td>
+          2010
+          -
+          2028
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Column.===
+        </td>
+        <td style="background: #AEF1AE">
+          spark.implicits.StringToColumn(scala.StringContext.apply(&quot;part_number&quot;)).$().===(0)
+        </td>
+      </tr><tr>
+        <td>
+          64
+        </td>
+        <td>
+          296
+        </td>
+        <td>
+          1985
+          -
+          2029
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.where
+        </td>
+        <td style="background: #AEF1AE">
+          dataWithPartNumber.where(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;part_number&quot;)).$().===(0))
+        </td>
+      </tr><tr>
+        <td>
+          67
+        </td>
+        <td>
+          298
+        </td>
+        <td>
+          2123
+          -
+          2196
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[String], String](((x: String) =&gt; Utils.extractString(x, 40, 160)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[String]]($m, {
+    final class $typecreator1 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator1 = {
+        $typecreator1.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)))
+      }
+    };
+    new $typecreator1()
+  })
+}: reflect.runtime.universe.TypeTag[Option[String]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator2 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator2 = {
+        $typecreator2.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator2()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          68
+        </td>
+        <td>
+          297
+        </td>
+        <td>
+          2165
+          -
+          2190
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractString
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractString(x, 40, 160)
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          301
+        </td>
+        <td>
+          2261
+          -
+          2294
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getShipName.apply(part_a.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          300
+        </td>
+        <td>
+          2273
+          -
+          2293
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_a.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          299
+        </td>
+        <td>
+          2248
+          -
+          2259
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;ship_name&quot;
+        </td>
+      </tr><tr>
+        <td>
+          72
+        </td>
+        <td>
+          302
+        </td>
+        <td>
+          2223
+          -
+          2295
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.withColumn
+        </td>
+        <td style="background: #AEF1AE">
+          part_a.withColumn(&quot;ship_name&quot;, getShipName.apply(part_a.apply(&quot;dataBinary&quot;)))
+        </td>
+      </tr><tr>
+        <td>
+          78
+        </td>
+        <td>
+          303
+        </td>
+        <td>
+          2407
+          -
+          2485
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.distinct
+        </td>
+        <td style="background: #AEF1AE">
+          part_a_decoded.select(&quot;ship_name&quot;, &quot;mmsi&quot;, &quot;timestamp&quot;).distinct()
+        </td>
+      </tr><tr>
+        <td>
+          85
+        </td>
+        <td>
+          304
+        </td>
+        <td>
+          2678
+          -
+          2697
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 40, 48)
+        </td>
+      </tr><tr>
+        <td>
+          85
+        </td>
+        <td>
+          305
+        </td>
+        <td>
+          2645
+          -
+          2698
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 40, 48)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator3 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator3 = {
+        $typecreator3.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator3()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator4 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator4 = {
+        $typecreator4.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator4()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          92
+        </td>
+        <td>
+          307
+        </td>
+        <td>
+          3285
+          -
+          3397
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[String], String](((x: String) =&gt; Utils.extractString(x, 48, 90)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[String]]($m, {
+    final class $typecreator5 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator5 = {
+        $typecreator5.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)))
+      }
+    };
+    new $typecreator5()
+  })
+}: reflect.runtime.universe.TypeTag[Option[String]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator6 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator6 = {
+        $typecreator6.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator6()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          94
+        </td>
+        <td>
+          306
+        </td>
+        <td>
+          3367
+          -
+          3391
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractString
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractString(x, 48, 90)
+        </td>
+      </tr><tr>
+        <td>
+          98
+        </td>
+        <td>
+          309
+        </td>
+        <td>
+          3422
+          -
+          3494
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[String], String](((x: String) =&gt; Utils.extractString(x, 90, 132)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[String]]($m, {
+    final class $typecreator7 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator7 = {
+        $typecreator7.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)))
+      }
+    };
+    new $typecreator7()
+  })
+}: reflect.runtime.universe.TypeTag[Option[String]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator8 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator8 = {
+        $typecreator8.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator8()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          99
+        </td>
+        <td>
+          308
+        </td>
+        <td>
+          3464
+          -
+          3488
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractString
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractString(x, 90, 132)
+        </td>
+      </tr><tr>
+        <td>
+          102
+        </td>
+        <td>
+          310
+        </td>
+        <td>
+          3548
+          -
+          3569
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 132, 141)
+        </td>
+      </tr><tr>
+        <td>
+          102
+        </td>
+        <td>
+          311
+        </td>
+        <td>
+          3515
+          -
+          3570
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 132, 141)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator9 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator9 = {
+        $typecreator9.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator9()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator10 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator10 = {
+        $typecreator10.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator10()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          104
+        </td>
+        <td>
+          313
+        </td>
+        <td>
+          3593
+          -
+          3648
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 141, 150)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator11 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator11 = {
+        $typecreator11.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator11()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator12 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator12 = {
+        $typecreator12.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator12()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          104
+        </td>
+        <td>
+          312
+        </td>
+        <td>
+          3626
+          -
+          3647
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 141, 150)
+        </td>
+      </tr><tr>
+        <td>
+          106
+        </td>
+        <td>
+          315
+        </td>
+        <td>
+          3670
+          -
+          3725
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 150, 156)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator13 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator13 = {
+        $typecreator13.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator13()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator14 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator14 = {
+        $typecreator14.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator14()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          106
+        </td>
+        <td>
+          314
+        </td>
+        <td>
+          3703
+          -
+          3724
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 150, 156)
+        </td>
+      </tr><tr>
+        <td>
+          108
+        </td>
+        <td>
+          316
+        </td>
+        <td>
+          3785
+          -
+          3806
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 156, 162)
+        </td>
+      </tr><tr>
+        <td>
+          108
+        </td>
+        <td>
+          317
+        </td>
+        <td>
+          3752
+          -
+          3807
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 156, 162)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator15 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator15 = {
+        $typecreator15.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator15()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator16 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator16 = {
+        $typecreator16.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator16()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          110
+        </td>
+        <td>
+          319
+        </td>
+        <td>
+          3837
+          -
+          3903
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 132, 162)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator17 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator17 = {
+        $typecreator17.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator17()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator18 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator18 = {
+        $typecreator18.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator18()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          111
+        </td>
+        <td>
+          318
+        </td>
+        <td>
+          3876
+          -
+          3897
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #F0ADAD">
+          Utils.extractInt(x, 132, 162)
+        </td>
+      </tr><tr>
+        <td>
+          117
+        </td>
+        <td>
+          327
+        </td>
+        <td>
+          3966
+          -
+          4196
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.where
+        </td>
+        <td style="background: #AEF1AE">
+          dataWithPartNumber.where(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;part_number&quot;)).$().===(1).||(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;part_number&quot;)).$().===(0).&amp;&amp;(Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(162))))
+        </td>
+      </tr><tr>
+        <td>
+          117
+        </td>
+        <td>
+          321
+        </td>
+        <td>
+          4015
+          -
+          4016
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          1
+        </td>
+      </tr><tr>
+        <td>
+          117
+        </td>
+        <td>
+          326
+        </td>
+        <td>
+          3998
+          -
+          4195
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Column.||
+        </td>
+        <td style="background: #AEF1AE">
+          spark.implicits.StringToColumn(scala.StringContext.apply(&quot;part_number&quot;)).$().===(1).||(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;part_number&quot;)).$().===(0).&amp;&amp;(Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(162)))
+        </td>
+      </tr><tr>
+        <td>
+          117
+        </td>
+        <td>
+          320
+        </td>
+        <td>
+          3998
+          -
+          4012
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          scala.StringContext.apply
+        </td>
+        <td style="background: #AEF1AE">
+          scala.StringContext.apply(&quot;part_number&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          120
+        </td>
+        <td>
+          322
+        </td>
+        <td>
+          4138
+          -
+          4152
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          scala.StringContext.apply
+        </td>
+        <td style="background: #AEF1AE">
+          scala.StringContext.apply(&quot;part_number&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          120
+        </td>
+        <td>
+          325
+        </td>
+        <td>
+          4138
+          -
+          4195
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Column.&amp;&amp;
+        </td>
+        <td style="background: #AEF1AE">
+          spark.implicits.StringToColumn(scala.StringContext.apply(&quot;part_number&quot;)).$().===(0).&amp;&amp;(Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(162))
+        </td>
+      </tr><tr>
+        <td>
+          120
+        </td>
+        <td>
+          324
+        </td>
+        <td>
+          4160
+          -
+          4195
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Column.===
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(162)
+        </td>
+      </tr><tr>
+        <td>
+          120
+        </td>
+        <td>
+          323
+        </td>
+        <td>
+          4155
+          -
+          4156
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          0
+        </td>
+      </tr><tr>
+        <td>
+          125
+        </td>
+        <td>
+          328
+        </td>
+        <td>
+          4263
+          -
+          4274
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;ship_type&quot;
+        </td>
+      </tr><tr>
+        <td>
+          125
+        </td>
+        <td>
+          330
+        </td>
+        <td>
+          4276
+          -
+          4309
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getShipType.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          125
+        </td>
+        <td>
+          329
+        </td>
+        <td>
+          4288
+          -
+          4308
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          126
+        </td>
+        <td>
+          331
+        </td>
+        <td>
+          4329
+          -
+          4340
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;vendor_id&quot;
+        </td>
+      </tr><tr>
+        <td>
+          126
+        </td>
+        <td>
+          333
+        </td>
+        <td>
+          4342
+          -
+          4375
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getVendorID.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          126
+        </td>
+        <td>
+          332
+        </td>
+        <td>
+          4354
+          -
+          4374
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          127
+        </td>
+        <td>
+          334
+        </td>
+        <td>
+          4395
+          -
+          4406
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;call_sign&quot;
+        </td>
+      </tr><tr>
+        <td>
+          127
+        </td>
+        <td>
+          336
+        </td>
+        <td>
+          4408
+          -
+          4441
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getCallSign.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          127
+        </td>
+        <td>
+          335
+        </td>
+        <td>
+          4420
+          -
+          4440
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          128
+        </td>
+        <td>
+          337
+        </td>
+        <td>
+          4461
+          -
+          4469
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;to_bow&quot;
+        </td>
+      </tr><tr>
+        <td>
+          128
+        </td>
+        <td>
+          339
+        </td>
+        <td>
+          4471
+          -
+          4501
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getToBow.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          128
+        </td>
+        <td>
+          338
+        </td>
+        <td>
+          4480
+          -
+          4500
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          129
+        </td>
+        <td>
+          340
+        </td>
+        <td>
+          4521
+          -
+          4531
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;to_stern&quot;
+        </td>
+      </tr><tr>
+        <td>
+          129
+        </td>
+        <td>
+          342
+        </td>
+        <td>
+          4533
+          -
+          4565
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getToStern.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          129
+        </td>
+        <td>
+          341
+        </td>
+        <td>
+          4544
+          -
+          4564
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          130
+        </td>
+        <td>
+          343
+        </td>
+        <td>
+          4585
+          -
+          4594
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;to_port&quot;
+        </td>
+      </tr><tr>
+        <td>
+          130
+        </td>
+        <td>
+          345
+        </td>
+        <td>
+          4596
+          -
+          4627
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getToPort.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          130
+        </td>
+        <td>
+          344
+        </td>
+        <td>
+          4606
+          -
+          4626
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          131
+        </td>
+        <td>
+          346
+        </td>
+        <td>
+          4647
+          -
+          4661
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;to_starboard&quot;
+        </td>
+      </tr><tr>
+        <td>
+          131
+        </td>
+        <td>
+          348
+        </td>
+        <td>
+          4663
+          -
+          4699
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getToStarboard.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          131
+        </td>
+        <td>
+          347
+        </td>
+        <td>
+          4678
+          -
+          4698
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          132
+        </td>
+        <td>
+          349
+        </td>
+        <td>
+          4719
+          -
+          4736
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;mothership_mmsi&quot;
+        </td>
+      </tr><tr>
+        <td>
+          132
+        </td>
+        <td>
+          352
+        </td>
+        <td>
+          4238
+          -
+          4778
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.withColumn
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.withColumn(&quot;ship_type&quot;, getShipType.apply(part_b.apply(&quot;dataBinary&quot;))).withColumn(&quot;vendor_id&quot;, getVendorID.apply(part_b.apply(&quot;dataBinary&quot;))).withColumn(&quot;call_sign&quot;, getCallSign.apply(part_b.apply(&quot;dataBinary&quot;))).withColumn(&quot;to_bow&quot;, getToBow.apply(part_b.apply(&quot;dataBinary&quot;))).withColumn(&quot;to_stern&quot;, getToStern.apply(part_b.apply(&quot;dataBinary&quot;))).withColumn(&quot;to_port&quot;, getToPort.apply(part_b.apply(&quot;dataBinary&quot;))).withColumn(&quot;to_starboard&quot;, getToStarboard.apply(part_b.apply(&quot;dataBinary&quot;))).withColumn(&quot;mothership_mmsi&quot;, getMothershipMMSI.apply(part_b.apply(&quot;dataBinary&quot;)))
+        </td>
+      </tr><tr>
+        <td>
+          132
+        </td>
+        <td>
+          351
+        </td>
+        <td>
+          4738
+          -
+          4777
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getMothershipMMSI.apply(part_b.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          132
+        </td>
+        <td>
+          350
+        </td>
+        <td>
+          4756
+          -
+          4776
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          part_b.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          139
+        </td>
+        <td>
+          354
+        </td>
+        <td>
+          5053
+          -
+          5103
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 6, 8)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator19 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator19 = {
+        $typecreator19.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator19()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator20 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator20 = {
+        $typecreator20.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator20()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          139
+        </td>
+        <td>
+          353
+        </td>
+        <td>
+          5085
+          -
+          5102
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 6, 8)
+        </td>
+      </tr><tr>
+        <td>
+          141
+        </td>
+        <td>
+          355
+        </td>
+        <td>
+          5155
+          -
+          5173
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 8, 38)
+        </td>
+      </tr><tr>
+        <td>
+          141
+        </td>
+        <td>
+          356
+        </td>
+        <td>
+          5123
+          -
+          5174
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 8, 38)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator21 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator21 = {
+        $typecreator21.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator21()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator22 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator22 = {
+        $typecreator22.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator22()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          143
+        </td>
+        <td>
+          358
+        </td>
+        <td>
+          5200
+          -
+          5362
+        </td>
+        <td>
+          ApplyToImplicitArgs
+        </td>
+        <td>
+          org.apache.spark.sql.functions.udf
+        </td>
+        <td style="background: #AEF1AE">
+          org.apache.spark.sql.functions.udf[Option[Int], String](((x: String) =&gt; Utils.extractInt(x, 38, 40)))(({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[Option[Int]]($m, {
+    final class $typecreator23 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator23 = {
+        $typecreator23.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticClass(&quot;scala.Option&quot;), scala.collection.immutable.List.apply[$u.Type]($m.staticClass(&quot;scala.Int&quot;).asType.toTypeConstructor))
+      }
+    };
+    new $typecreator23()
+  })
+}: reflect.runtime.universe.TypeTag[Option[Int]]), ({
+  val $u: reflect.runtime.universe.type = scala.reflect.runtime.`package`.universe;
+  val $m: $u.Mirror = scala.reflect.runtime.`package`.universe.runtimeMirror(this.getClass().getClassLoader());
+  $u.TypeTag.apply[String]($m, {
+    final class $typecreator24 extends TypeCreator {
+      def &lt;init&gt;(): $typecreator24 = {
+        $typecreator24.super.&lt;init&gt;();
+        ()
+      };
+      def apply[U &lt;: scala.reflect.api.Universe with Singleton]($m$untyped: scala.reflect.api.Mirror[U]): U#Type = {
+        val $u: U = $m$untyped.universe;
+        val $m: $u.Mirror = $m$untyped.asInstanceOf[$u.Mirror];
+        $u.internal.reificationSupport.TypeRef($u.internal.reificationSupport.SingleType($u.internal.reificationSupport.ThisType($m.staticPackage(&quot;scala&quot;).asModule.moduleClass), $m.staticModule(&quot;scala.Predef&quot;)), $u.internal.reificationSupport.selectType($m.staticModule(&quot;scala.Predef&quot;).asModule.moduleClass, &quot;String&quot;), immutable.this.Nil)
+      }
+    };
+    new $typecreator24()
+  })
+}: reflect.runtime.universe.TypeTag[String]))
+        </td>
+      </tr><tr>
+        <td>
+          146
+        </td>
+        <td>
+          357
+        </td>
+        <td>
+          5337
+          -
+          5356
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          uk.gov.dft.ais.decode.Utils.extractInt
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.extractInt(x, 38, 40)
+        </td>
+      </tr><tr>
+        <td>
+          158
+        </td>
+        <td>
+          359
+        </td>
+        <td>
+          5813
+          -
+          5825
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Column.===
+        </td>
+        <td style="background: #AEF1AE">
+          spark.implicits.StringToColumn(scala.StringContext.apply(&quot;id&quot;)).$().===(24)
+        </td>
+      </tr><tr>
+        <td>
+          160
+        </td>
+        <td>
+          364
+        </td>
+        <td>
+          5687
+          -
+          5975
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.where
+        </td>
+        <td style="background: #AEF1AE">
+          binaryDecodedMessages.where(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;id&quot;)).$().===(24)).where(Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(168).||(Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(162)))
+        </td>
+      </tr><tr>
+        <td>
+          161
+        </td>
+        <td>
+          361
+        </td>
+        <td>
+          5919
+          -
+          5922
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          168
+        </td>
+      </tr><tr>
+        <td>
+          161
+        </td>
+        <td>
+          360
+        </td>
+        <td>
+          5900
+          -
+          5913
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.SQLImplicits.StringToColumn.$
+        </td>
+        <td style="background: #AEF1AE">
+          spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()
+        </td>
+      </tr><tr>
+        <td>
+          161
+        </td>
+        <td>
+          363
+        </td>
+        <td>
+          5887
+          -
+          5969
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Column.||
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(168).||(Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(162))
+        </td>
+      </tr><tr>
+        <td>
+          162
+        </td>
+        <td>
+          362
+        </td>
+        <td>
+          5934
+          -
+          5969
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Column.===
+        </td>
+        <td style="background: #AEF1AE">
+          Utils.stringLength.apply(spark.implicits.StringToColumn(scala.StringContext.apply(&quot;dataBinary&quot;)).$()).===(162)
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          367
+        </td>
+        <td>
+          6073
+          -
+          6108
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getRepeat.apply(msg_24_raw.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          366
+        </td>
+        <td>
+          6083
+          -
+          6107
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          msg_24_raw.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          167
+        </td>
+        <td>
+          365
+        </td>
+        <td>
+          6053
+          -
+          6071
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;repeat_indicator&quot;
+        </td>
+      </tr><tr>
+        <td>
+          168
+        </td>
+        <td>
+          370
+        </td>
+        <td>
+          6136
+          -
+          6169
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getMMSI.apply(msg_24_raw.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          168
+        </td>
+        <td>
+          369
+        </td>
+        <td>
+          6144
+          -
+          6168
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          msg_24_raw.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          168
+        </td>
+        <td>
+          368
+        </td>
+        <td>
+          6128
+          -
+          6134
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;mmsi&quot;
+        </td>
+      </tr><tr>
+        <td>
+          169
+        </td>
+        <td>
+          373
+        </td>
+        <td>
+          6204
+          -
+          6243
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.expressions.UserDefinedFunction.apply
+        </td>
+        <td style="background: #AEF1AE">
+          getPartNumber.apply(msg_24_raw.apply(&quot;dataBinary&quot;))
+        </td>
+      </tr><tr>
+        <td>
+          169
+        </td>
+        <td>
+          372
+        </td>
+        <td>
+          6218
+          -
+          6242
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.apply
+        </td>
+        <td style="background: #AEF1AE">
+          msg_24_raw.apply(&quot;dataBinary&quot;)
+        </td>
+      </tr><tr>
+        <td>
+          169
+        </td>
+        <td>
+          371
+        </td>
+        <td>
+          6189
+          -
+          6202
+        </td>
+        <td>
+          Literal
+        </td>
+        <td>
+          &lt;nosymbol&gt;
+        </td>
+        <td style="background: #AEF1AE">
+          &quot;part_number&quot;
+        </td>
+      </tr><tr>
+        <td>
+          169
+        </td>
+        <td>
+          374
+        </td>
+        <td>
+          6024
+          -
+          6244
+        </td>
+        <td>
+          Apply
+        </td>
+        <td>
+          org.apache.spark.sql.Dataset.withColumn
+        </td>
+        <td style="background: #AEF1AE">
+          msg_24_raw.withColumn(&quot;repeat_indicator&quot;, getRepeat.apply(msg_24_raw.apply(&quot;dataBinary&quot;))).withColumn(&quot;mmsi&quot;, getMMSI.apply(msg_24_raw.apply(&quot;dataBinary&quot;))).withColumn(&quot;part_number&quot;, getPartNumber.apply(msg_24_raw.apply(&quot;dataBinary&quot;)))
+        </td>
+      </tr>
+    </table>
+          </div>
+        </div>
+      </body>
+    </html>
