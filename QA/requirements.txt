@@ -1,0 +1,4 @@
+-i https://pypi.org/simple
+libais==0.17
+numpy==1.16.0
+six==1.12.0
