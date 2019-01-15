@@ -1,18 +1,3 @@
-# Spark/Scala - AIS Decoder
-
-A decoder to transform raw AIS messages to tabular parquet files. 
-
-Currently supporting message types:
-
-* **1**, **2** and **3**: Position Report Class A
-* **5**: Static and Voyage Related Data
-* **18**: Standard Class B CS Position Report
-* **24**: Static Data Report
-
-## Approach
-
-The decoder builds on the code from [datasciencecampus/off-course](https://github.com/datasciencecampus/off-course). We also followed the specification detailed in [Eric S. Raymond's writeup](http://catb.org/gpsd/AIVDM.html) of AIVDM/AIVDO protocol and adapted [schwehr/libais](https://github.com/schwehr/libais) C++ implementation. 
-
 ## Code
 
 Written in `scala` 2.11.8 and built using `sbt` 1.2.6. 
@@ -103,7 +88,6 @@ Then launch a Chrome instance configured to use that tunnel:
 The UI's will then be available from that browser at: 
 
 - Hadoop dashboard: http://ais-dataproc-m:8088/cluster
-
 - HDFS namenode: http://ais-dataproc-m:9870/
 
 ### Delete cluster
