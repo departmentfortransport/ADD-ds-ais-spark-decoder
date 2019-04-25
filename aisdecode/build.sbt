@@ -15,6 +15,7 @@ lazy val root = (project in file(".")).
        "com.holdenkarau" %% "spark-testing-base" % "2.3.1_0.10.0" % "test",
        "org.apache.spark" %% "spark-hive" % "2.3.1" % "test"
     ),
+    mainClass := Some("uk.gov.dft.ais.decode.RawDecode"),
     fork in Test := true,
     javaOptions ++= Seq("-Xms512M", "-Xmx2048M", "-XX:+CMSClassUnloadingEnabled"),
     parallelExecution in Test := false
